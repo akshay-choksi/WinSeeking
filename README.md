@@ -16,7 +16,7 @@ Upload each asset in GitHub’s README editor, then paste the generated Markdown
 Auth → Home (leagues) → League (event + season boards)
                      ↘ Draft (salary-cap lineup)
                      ↘ Lineup viewer (live scoring breakdown)
-Admin → Sync Odds → Sync Results → Finalize Event
+Admin → Sync Odds → Sync Results (auto-finalizes when the PGA event is official)
 ```
 
 ### Dashboard — your leagues
@@ -173,7 +173,7 @@ Then open `/admin` → **Sync Tournament Odds**.
 2. **Draft** a lineup before `lineup_lock_at` (first tee / Thursday). Over-budget adds are blocked.
 3. **Event leaderboard** ranks lineup fantasy points and updates through Supabase Realtime.
 4. **Lineup viewer** shows the live per-golfer breakdown and lets league members request a DataGolf refresh during an event.
-5. **Finalize Event** awards season points from league finish × event multiplier (standard 1× / signature 1.5× / major 2×), stores per-event place/season points on each lineup, and tracks wins / top-5 finishes on season standings.
+5. When the PGA event is final, **Sync Results** (or **Sync Odds**) auto-finalizes: season points from league finish × event multiplier (standard 1× / signature 1.5× / major 2×), stores place/season points on each lineup, and tracks wins / top-5s. Manual **Finalize Event** remains as a fallback.
 
 Fantasy scoring follows **DraftKings Classic Golf**: hole points (eagle +8, birdie +3, par +0.5, bogey −0.5, double+ −1), live place bonuses (1st +30 … 50th +1), plus DK streaks/bonuses. Place points update on every live score refresh.
 

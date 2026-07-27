@@ -38,7 +38,7 @@ Or run the SQL in `supabase/migrations/20260716182000_odds_pricing_fedex_scoring
 3. **Sync Tournament Odds** — schedule + field + salaries for the active PGA event.
 4. Members draft lineups before Thursday lock.
 5. During the event, members can use **Refresh live scores** from a lineup, or an admin can force **Sync Results**.
-6. After the event, **Finalize Event** to award FedEx-style season points.
+6. When the PGA event is final (DataGolf schedule / finished field), **Sync Results** (or **Sync Odds**) auto-finalizes season points. **Finalize Event** remains available as a manual fallback.
 
 Member refreshes require league membership and are deduplicated by a two-minute
 per-tournament cooldown in `result_sync_state`. One refresh updates every lineup

@@ -9,6 +9,7 @@ import {
   requireUser,
 } from "../_shared/datagolf.ts";
 import { fetchEspnHoleStatsMap, lookupHoleStats } from "../_shared/espn.ts";
+import { detectEventFinal, finalizeTournament, mapScheduleStatus } from "../_shared/finalize.ts";
 
 type InPlayPlayer = Record<string, unknown>;
 
@@ -353,13 +354,40 @@ Deno.serve(async (req) => {
       })
       .eq("tournament_id", tournament.id);
 
+    // Auto-finalize when the PGA event is officially over (schedule and/or in-play).
+    let autoFinalized = false;
+    let finalizeMessage: string | null = null;
+    let awards = 0;
+    if (tournament.status !== "completed" && resultRows.length > 0) {
+      let scheduleCompleted = false;
+      try {
+        scheduleCompleted = await scheduleMarksCompleted(
+          tournament.dg_event_id,
+          tournament.season_year,
+        );
+      } catch {
+        // Schedule probe is best-effort; in-play heuristics still apply.
+      }
+      const isFinal = detectEventFinal(inPlayRaw, players, scheduleCompleted);
+      if (isFinal) {
+        const finalized = await finalizeTournament(admin, tournament.id);
+        autoFinalized = true;
+        finalizeMessage = finalized.message;
+        awards = finalized.awards;
+      }
+    }
+
+    const baseMessage = `Synced results for ${tournament.name}: ${resultRows.length} players, ${lineupIds.length} lineups.`;
     return jsonResponse({
-      message: `Synced results for ${tournament.name}: ${resultRows.length} players, ${lineupIds.length} lineups.`,
+      message: finalizeMessage ? `${baseMessage} ${finalizeMessage}` : baseMessage,
       tournamentId: tournament.id,
       resultsUpserted: resultRows.length,
       lineupsUpdated: lineupIds.length,
       cached: false,
       lastSyncedAt: completedAt,
+      autoFinalized,
+      awards,
+      finalizeMessage,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "sync-results failed";
@@ -390,6 +418,35 @@ function extractInPlayPlayers(raw: unknown): InPlayPlayer[] {
     const obj = raw as Record<string, unknown>;
     for (const key of ["data", "players", "live_stats", "field"]) {
       if (Array.isArray(obj[key])) return obj[key] as InPlayPlayer[];
+    }
+  }
+  return [];
+}
+
+async function scheduleMarksCompleted(dgEventId: string, seasonYear: number): Promise<boolean> {
+  if (!dgEventId) return false;
+  const scheduleRaw = await dgFetch<unknown>("/get-schedule", {
+    tour: "pga",
+    season: seasonYear,
+    upcoming_only: "no",
+  });
+  const events = normalizeSchedule(scheduleRaw);
+  const match = events.find((e) => String(e.event_id ?? "") === String(dgEventId));
+  if (!match) {
+    // Fall back to name-insensitive match via event id only.
+    return false;
+  }
+  return mapScheduleStatus(match) === "completed";
+}
+
+function normalizeSchedule(raw: unknown): { event_id?: string | number; status?: string; winner?: string }[] {
+  if (Array.isArray(raw)) return raw as { event_id?: string | number; status?: string; winner?: string }[];
+  if (raw && typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    for (const key of ["schedule", "events", "data"]) {
+      if (Array.isArray(obj[key])) {
+        return obj[key] as { event_id?: string | number; status?: string; winner?: string }[];
+      }
     }
   }
   return [];

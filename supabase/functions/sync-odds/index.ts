@@ -11,6 +11,7 @@ import {
   requireAdmin,
   thursdayLockAt,
 } from "../_shared/datagolf.ts";
+import { finalizeTournament, mapScheduleStatus } from "../_shared/finalize.ts";
 
 type ScheduleEvent = {
   event_id?: string | number;
@@ -77,9 +78,18 @@ Deno.serve(async (req) => {
         fedex_multiplier: multiplierForEventType(eventType),
         lineup_lock_at: lockAt,
       };
-      // Always apply completed from DataGolf; for upcoming leave existing open/in_progress alone
+      // Completed on the schedule → finalize (awards season pts) instead of only flipping status.
       if (mappedStatus === "completed") {
-        row.status = "completed";
+        const { data: existing } = await admin
+          .from("tournaments")
+          .select("id, status")
+          .eq("dg_event_id", dgEventId)
+          .maybeSingle();
+        if (existing && existing.status !== "completed") {
+          await finalizeTournament(admin, existing.id);
+        } else {
+          row.status = "completed";
+        }
       } else if (mappedStatus === "scheduled") {
         // Only set scheduled on insert — don't downgrade open/in_progress via blind upsert.
         // Fetch existing; if missing or already scheduled, set scheduled.
@@ -367,17 +377,6 @@ function extractFieldMeta(raw: unknown): {
         ? Math.trunc(Number(tzRaw))
         : null;
   return { eventId, eventName, startDate, endDate, currentRound, tzOffsetSeconds };
-}
-
-/** Map DataGolf schedule status → our tournament_status. */
-function mapScheduleStatus(ev: ScheduleEvent): "completed" | "scheduled" | null {
-  const s = (ev.status ?? "").toLowerCase().trim();
-  if (s === "completed" || s === "complete" || s === "final") return "completed";
-  // Winner present and not TBD → completed
-  const winner = (ev.winner ?? "").trim();
-  if (winner && winner.toUpperCase() !== "TBD") return "completed";
-  if (s === "upcoming" || s === "scheduled" || s === "preview") return "scheduled";
-  return null;
 }
 
 function extractFieldPlayers(raw: unknown): FieldPlayer[] {

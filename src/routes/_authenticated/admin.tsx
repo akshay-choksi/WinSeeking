@@ -229,8 +229,8 @@ function AdminPage() {
         <div>
           <h2 className="font-semibold">Live Results & Finalize</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Sync live scores into fantasy points, then finalize to award season points by league
-            finish.
+            Sync live scores into fantasy points. When DataGolf marks the event final, sync
+            auto-finalizes season points (wins / top‑5s). You can still Finalize Event manually.
           </p>
         </div>
 
