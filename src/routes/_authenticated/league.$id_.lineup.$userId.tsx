@@ -2,11 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useLiveScoreRefresh, useOnLiveScoresUpdated } from "@/hooks/use-live-score-refresh";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Lock, RefreshCw } from "lucide-react";
 import { GolferAvatar } from "@/components/golfer-avatar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { toast } from "sonner";
 import {
   breakdownFantasyPoints,
   formatAmericanOdds,
@@ -96,11 +96,19 @@ function LineupViewerPage() {
   const [lineupTotal, setLineupTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
   const isOwn = Boolean(user?.id && user.id === userId);
   const locked = tournament ? isLineupLocked(tournament) : false;
+  const { refresh: refreshScores, refreshing } = useLiveScoreRefresh({
+    leagueId,
+    tournamentId: tournament?.id,
+  });
+
+  useOnLiveScoresUpdated((detail) => {
+    if (detail?.lastSyncedAt) setLastSyncedAt(detail.lastSyncedAt);
+    void load();
+  });
 
   async function load() {
     const gen = ++loadGenRef.current;
@@ -290,25 +298,9 @@ function LineupViewerPage() {
 
   async function refreshLiveScores() {
     if (!tournament || refreshing) return;
-    setRefreshing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("sync-results", {
-        body: { tournament_id: tournament.id, league_id: leagueId },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      setLastSyncedAt(data?.lastSyncedAt ?? new Date().toISOString());
-      await load();
-      toast.success(data?.cached ? "Scores are already current" : "Live scores refreshed", {
-        description: data?.message,
-      });
-    } catch (err) {
-      toast.error("Could not refresh scores", {
-        description: err instanceof Error ? err.message : "Try again in a moment.",
-      });
-    } finally {
-      setRefreshing(false);
-    }
+    const result = await refreshScores("manual");
+    if (result.lastSyncedAt) setLastSyncedAt(result.lastSyncedAt);
+    await load();
   }
 
   useEffect(() => {
@@ -431,7 +423,7 @@ function LineupViewerPage() {
               <p className="mt-1.5 text-[11px] text-slate-400">
                 {lastSyncedAt
                   ? `Updated ${new Date(lastSyncedAt).toLocaleTimeString()}`
-                  : "Uses live DataGolf results"}
+                  : "Pull down to refresh · or tap"}
               </p>
             </div>
           ) : null}
@@ -457,8 +449,83 @@ function LineupViewerPage() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm">
+            {/* Mobile cards */}
+            <div className="divide-y md:hidden">
+              {rows.map((r) => {
+                const bd = breakdownFantasyPoints({
+                  position: r.position,
+                  doubleEagles: r.double_eagles,
+                  eagles: r.eagles,
+                  birdies: r.birdies,
+                  pars: r.pars,
+                  bogeys: r.bogeys,
+                  doubleBogeys: r.double_bogeys,
+                  bonusPoints: r.bonus_points,
+                });
+                const pts = r.fantasy_points || bd.total;
+                const eagleCount = bd.eagleCount + bd.doubleEagleCount;
+                const eaglePts = bd.eaglePts + bd.doubleEaglePts;
+                return (
+                  <div key={r.golfer_id} className="space-y-3 p-4">
+                    <div className="flex items-start gap-3">
+                      <GolferAvatar name={r.name} pgaPlayerNum={r.pga_player_num} />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-slate-900">{r.name}</div>
+                        <div className="text-xs text-slate-500">
+                          {formatAmericanOdds(r.decimal_odds)} · {formatOwgr(r.owgr_rank)}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-mono text-lg font-bold text-emerald-700">
+                          {pts.toFixed(1)}
+                        </div>
+                        <div className="text-[10px] uppercase tracking-wide text-slate-400">
+                          pts
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="rounded-lg bg-slate-50 px-2 py-2">
+                        <div className="text-[10px] uppercase text-slate-400">Pos</div>
+                        <div className="font-mono font-semibold text-slate-800">
+                          {formatPos(r.position, r.status)}
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 px-2 py-2">
+                        <div className="text-[10px] uppercase text-slate-400">Score</div>
+                        <div className="font-mono font-semibold text-slate-800">
+                          {formatToPar(r.total_to_par)}
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 px-2 py-2">
+                        <div className="text-[10px] uppercase text-slate-400">Place</div>
+                        <div className="font-mono font-semibold text-emerald-700">
+                          {formatPts(bd.finish)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-x-2 gap-y-2 text-xs sm:grid-cols-6">
+                      <MobileStat label="Birdies" count={bd.birdieCount} pts={bd.birdiePts} />
+                      <MobileStat label="Eagles" count={eagleCount} pts={eaglePts} />
+                      <MobileStat label="Pars" count={bd.parCount} pts={bd.parPts} />
+                      <MobileStat label="Bogeys" count={bd.bogeyCount} pts={bd.bogeyPts} />
+                      <MobileStat label="Dbl+" count={bd.doubleBogeyCount} pts={bd.doubleBogeyPts} />
+                      <MobileStat label="Bonus" pts={bd.bonusPoints} />
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="flex items-center justify-between bg-slate-50 px-4 py-3">
+                <span className="text-xs font-semibold uppercase text-slate-500">Total</span>
+                <span className="font-mono text-lg font-bold text-emerald-700">
+                  {lineupTotal.toFixed(1)}
+                </span>
+              </div>
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
                   <tr>
                     <th className="px-4 py-2">Golfer</th>
@@ -557,6 +624,26 @@ function LineupViewerPage() {
             </p>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function MobileStat({
+  label,
+  count,
+  pts,
+}: {
+  label: string;
+  count?: number;
+  pts: number;
+}) {
+  return (
+    <div className="rounded-md border border-slate-100 px-2 py-1.5 text-center">
+      <div className="text-[10px] uppercase tracking-wide text-slate-400">{label}</div>
+      {count != null ? <div className="font-mono text-slate-800">{count}</div> : null}
+      <div className={`font-mono text-[11px] ${pts < 0 ? "text-red-600" : "text-emerald-700"}`}>
+        {formatPts(pts)}
       </div>
     </div>
   );

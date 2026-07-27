@@ -23,10 +23,9 @@ Before sharing the URL:
 
 ## Live result refresh
 
-League members can refresh an in-progress lineup from its lineup page.
-`sync-results` checks membership and uses a two-minute, per-tournament database
-cooldown. Concurrent clicks return the most recently synced data instead of
-making duplicate DataGolf requests.
+League members refresh live scores on sign-in, pull-to-refresh, or from an
+in-progress lineup. `sync-results` checks membership and fetches fresh DataGolf
+data on each request (no artificial cooldown).
 
 This user-triggered model replaces a cron job for the friend beta:
 

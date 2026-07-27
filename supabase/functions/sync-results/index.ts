@@ -86,9 +86,9 @@ Deno.serve(async (req) => {
 
     if (!isAdmin) {
       if (!leagueId) throw new Error("League required");
-      if (tournament.status !== "in_progress") {
+      if (tournament.status !== "in_progress" && tournament.status !== "completed") {
         return jsonResponse(
-          { error: "Live score refresh is available while the event is in progress." },
+          { error: "Live score refresh is available for live or just-finished events." },
           409,
         );
       }
@@ -108,27 +108,26 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: `${tournament.name} has not started yet.` }, 409);
     }
 
-    const cooldownSeconds = isAdmin && force ? 0 : 120;
+    // No artificial member cooldown — DataGolf rate limits are fine if they occur.
+    // claim_result_sync still serializes overlapping starts when cooldown is 0
+    // (always claims) so we always fetch fresh unless the claim RPC errors.
     const { data: claimed, error: claimError } = await admin.rpc("claim_result_sync", {
       _tournament_id: tournament.id,
-      _cooldown_seconds: cooldownSeconds,
+      _cooldown_seconds: 0,
     });
     if (claimError) throw new Error(claimError.message);
 
     if (!claimed) {
+      // Should be rare with cooldown 0; fall back to last known sync metadata.
       const { data: state } = await admin
         .from("result_sync_state")
         .select("last_started_at, last_completed_at, last_status")
         .eq("tournament_id", tournament.id)
         .maybeSingle();
-      const elapsedSeconds = state?.last_started_at
-        ? Math.floor((Date.now() - new Date(state.last_started_at).getTime()) / 1000)
-        : 0;
       return jsonResponse({
-        message: "Scores were refreshed recently. Showing the latest available results.",
+        message: "Another refresh is already in progress. Showing the latest available results.",
         tournamentId: tournament.id,
         cached: true,
-        retryAfterSeconds: Math.max(120 - elapsedSeconds, 1),
         lastSyncedAt: state?.last_completed_at ?? state?.last_started_at ?? null,
       });
     }

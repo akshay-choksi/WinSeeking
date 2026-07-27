@@ -2,6 +2,7 @@ import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useOnLiveScoresUpdated } from "@/hooks/use-live-score-refresh";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -212,6 +213,11 @@ function LeaguePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  useOnLiveScoresUpdated(() => {
+    if (selectedTournamentId) void loadEventStandings(selectedTournamentId);
+    void loadSeasonStandings();
+  });
+
   useEffect(() => {
     if (!selectedTournamentId) {
       setEventStandings([]);
@@ -370,12 +376,14 @@ function LeaguePage() {
       )}
 
       <Tabs defaultValue="event" className="gap-4">
-        <TabsList className="h-11 w-full justify-start gap-1 rounded-xl bg-muted/70 p-1 sm:w-auto">
-          <TabsTrigger value="event" className="rounded-lg px-4">
-            Event Leaderboard
+        <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-xl bg-muted/70 p-1 sm:h-11 sm:w-auto sm:flex-nowrap">
+          <TabsTrigger value="event" className="min-h-10 flex-1 rounded-lg px-3 sm:flex-none sm:px-4">
+            Event
+            <span className="ml-1 hidden sm:inline">Leaderboard</span>
           </TabsTrigger>
-          <TabsTrigger value="season" className="rounded-lg px-4">
-            Season Standings
+          <TabsTrigger value="season" className="min-h-10 flex-1 rounded-lg px-3 sm:flex-none sm:px-4">
+            Season
+            <span className="ml-1 hidden sm:inline">Standings</span>
           </TabsTrigger>
         </TabsList>
 
@@ -385,7 +393,7 @@ function LeaguePage() {
               value={selectedTournamentId ?? ""}
               onValueChange={(v) => setSelectedTournamentId(v)}
             >
-              <SelectTrigger className="w-[min(100%,320px)] bg-card shadow-sm">
+              <SelectTrigger className="w-full bg-card shadow-sm sm:w-[min(100%,320px)]">
                 <SelectValue placeholder="Select event" />
               </SelectTrigger>
               <SelectContent>
@@ -426,79 +434,133 @@ function LeaguePage() {
                 No lineups submitted for this event yet.
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/20 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <tr>
-                      <th className="px-5 py-2.5 w-12">Place</th>
-                      <th className="px-5 py-2.5">Player</th>
-                      <th className="px-5 py-2.5">Golfers</th>
-                      <th className="px-5 py-2.5 text-right">Spent</th>
-                      <th className="px-5 py-2.5 text-right">Fantasy Pts</th>
-                      <th className="px-5 py-2.5 text-right">Season Pts</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {eventStandings.map((s, i) => {
-                      const canView = locked || s.user_id === user?.id;
-                      const isYou = s.user_id === user?.id;
-                      const place = s.league_finish ?? i + 1;
-                      const showSeasonPts =
-                        selectedTournament?.status === "completed" || s.league_finish != null;
-                      return (
-                        <tr
-                          key={s.user_id}
-                          className="border-t border-border/70 transition hover:bg-brand-muted/30"
-                        >
-                          <td className="px-5 py-3 font-mono text-muted-foreground">
-                            {place === 1 ? (
-                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
-                                1
-                              </span>
-                            ) : (
-                              place
-                            )}
-                          </td>
-                          <td className="px-5 py-3 font-medium">
-                            {canView ? (
-                              <Link
-                                to="/league/$id/lineup/$userId"
-                                params={{ id, userId: s.user_id }}
-                                search={{ tournament: selectedTournamentId ?? undefined }}
-                                className="text-primary hover:underline"
-                              >
+              <>
+                {/* Mobile stacked rows */}
+                <div className="divide-y md:hidden">
+                  {eventStandings.map((s, i) => {
+                    const canView = locked || s.user_id === user?.id;
+                    const isYou = s.user_id === user?.id;
+                    const place = s.league_finish ?? i + 1;
+                    const showSeasonPts =
+                      selectedTournament?.status === "completed" || s.league_finish != null;
+                    const row = (
+                      <div className="flex items-center gap-3 px-4 py-3">
+                        <div className="w-7 shrink-0 text-center font-mono text-sm text-muted-foreground">
+                          {place === 1 ? (
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
+                              1
+                            </span>
+                          ) : (
+                            place
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <PlayerLabel
+                            name={s.full_name ?? "Player"}
+                            avatarUrl={s.avatar_url}
+                            isYou={isYou}
+                          />
+                          <div className="mt-0.5 text-xs text-muted-foreground">
+                            {s.golfer_count}/{rosterSize} · ${s.total_spent.toLocaleString()}
+                            {showSeasonPts ? ` · Season ${s.season_points.toFixed(1)}` : ""}
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right font-mono text-base font-semibold tabular-nums text-success">
+                          {s.total_points.toFixed(1)}
+                        </div>
+                      </div>
+                    );
+                    return canView ? (
+                      <Link
+                        key={s.user_id}
+                        to="/league/$id/lineup/$userId"
+                        params={{ id, userId: s.user_id }}
+                        search={{ tournament: selectedTournamentId ?? undefined }}
+                        className="block transition hover:bg-brand-muted/30"
+                      >
+                        {row}
+                      </Link>
+                    ) : (
+                      <div key={s.user_id}>{row}</div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop table */}
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/20 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <tr>
+                        <th className="px-5 py-2.5 w-12">Place</th>
+                        <th className="px-5 py-2.5">Player</th>
+                        <th className="px-5 py-2.5">Golfers</th>
+                        <th className="px-5 py-2.5 text-right">Spent</th>
+                        <th className="px-5 py-2.5 text-right">Fantasy Pts</th>
+                        <th className="px-5 py-2.5 text-right">Season Pts</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {eventStandings.map((s, i) => {
+                        const canView = locked || s.user_id === user?.id;
+                        const isYou = s.user_id === user?.id;
+                        const place = s.league_finish ?? i + 1;
+                        const showSeasonPts =
+                          selectedTournament?.status === "completed" || s.league_finish != null;
+                        return (
+                          <tr
+                            key={s.user_id}
+                            className="border-t border-border/70 transition hover:bg-brand-muted/30"
+                          >
+                            <td className="px-5 py-3 font-mono text-muted-foreground">
+                              {place === 1 ? (
+                                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
+                                  1
+                                </span>
+                              ) : (
+                                place
+                              )}
+                            </td>
+                            <td className="px-5 py-3 font-medium">
+                              {canView ? (
+                                <Link
+                                  to="/league/$id/lineup/$userId"
+                                  params={{ id, userId: s.user_id }}
+                                  search={{ tournament: selectedTournamentId ?? undefined }}
+                                  className="text-primary hover:underline"
+                                >
+                                  <PlayerLabel
+                                    name={s.full_name ?? "Player"}
+                                    avatarUrl={s.avatar_url}
+                                    isYou={isYou}
+                                  />
+                                </Link>
+                              ) : (
                                 <PlayerLabel
                                   name={s.full_name ?? "Player"}
                                   avatarUrl={s.avatar_url}
                                   isYou={isYou}
                                 />
-                              </Link>
-                            ) : (
-                              <PlayerLabel
-                                name={s.full_name ?? "Player"}
-                                avatarUrl={s.avatar_url}
-                                isYou={isYou}
-                              />
-                            )}
-                          </td>
-                          <td className="px-5 py-3 tabular-nums">
-                            {s.golfer_count} / {rosterSize}
-                          </td>
-                          <td className="px-5 py-3 text-right font-mono tabular-nums">
-                            ${s.total_spent.toLocaleString()}
-                          </td>
-                          <td className="px-5 py-3 text-right font-mono text-base font-semibold tabular-nums text-success">
-                            {s.total_points.toFixed(1)}
-                          </td>
-                          <td className="px-5 py-3 text-right font-mono tabular-nums text-muted-foreground">
-                            {showSeasonPts ? s.season_points.toFixed(1) : "—"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                              )}
+                            </td>
+                            <td className="px-5 py-3 tabular-nums">
+                              {s.golfer_count} / {rosterSize}
+                            </td>
+                            <td className="px-5 py-3 text-right font-mono tabular-nums">
+                              ${s.total_spent.toLocaleString()}
+                            </td>
+                            <td className="px-5 py-3 text-right font-mono text-base font-semibold tabular-nums text-success">
+                              {s.total_points.toFixed(1)}
+                            </td>
+                            <td className="px-5 py-3 text-right font-mono tabular-nums text-muted-foreground">
+                              {showSeasonPts ? s.season_points.toFixed(1) : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </SurfacePanel>
         </TabsContent>
@@ -514,49 +576,80 @@ function LeaguePage() {
                 No season points yet. Finalize an event after it completes.
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/20 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <tr>
-                      <th className="px-5 py-2.5 w-12">#</th>
-                      <th className="px-5 py-2.5">Player</th>
-                      <th className="px-5 py-2.5 text-right">Wins</th>
-                      <th className="px-5 py-2.5 text-right">Top 5</th>
-                      <th className="px-5 py-2.5 text-right">Season Pts</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {seasonStandings.map((s, i) => (
-                      <tr
-                        key={s.user_id}
-                        className="border-t border-border/70 transition hover:bg-brand-muted/30"
-                      >
-                        <td className="px-5 py-3 font-mono text-muted-foreground">
-                          {i === 0 ? (
-                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
-                              1
-                            </span>
-                          ) : (
-                            i + 1
-                          )}
-                        </td>
-                        <td className="px-5 py-3 font-medium">
-                          <PlayerLabel
-                            name={s.full_name ?? "Player"}
-                            avatarUrl={s.avatar_url}
-                            isYou={s.user_id === user?.id}
-                          />
-                        </td>
-                        <td className="px-5 py-3 text-right tabular-nums">{s.wins}</td>
-                        <td className="px-5 py-3 text-right tabular-nums">{s.top5s}</td>
-                        <td className="px-5 py-3 text-right font-mono text-base font-semibold tabular-nums text-success">
-                          {s.fedex_points.toFixed(1)}
-                        </td>
+              <>
+                <div className="divide-y md:hidden">
+                  {seasonStandings.map((s, i) => (
+                    <div key={s.user_id} className="flex items-center gap-3 px-4 py-3">
+                      <div className="w-7 shrink-0 text-center font-mono text-sm text-muted-foreground">
+                        {i === 0 ? (
+                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
+                            1
+                          </span>
+                        ) : (
+                          i + 1
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <PlayerLabel
+                          name={s.full_name ?? "Player"}
+                          avatarUrl={s.avatar_url}
+                          isYou={s.user_id === user?.id}
+                        />
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          {s.wins} win{s.wins === 1 ? "" : "s"} · {s.top5s} top 5
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right font-mono text-base font-semibold tabular-nums text-success">
+                        {s.fedex_points.toFixed(1)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/20 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <tr>
+                        <th className="px-5 py-2.5 w-12">#</th>
+                        <th className="px-5 py-2.5">Player</th>
+                        <th className="px-5 py-2.5 text-right">Wins</th>
+                        <th className="px-5 py-2.5 text-right">Top 5</th>
+                        <th className="px-5 py-2.5 text-right">Season Pts</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {seasonStandings.map((s, i) => (
+                        <tr
+                          key={s.user_id}
+                          className="border-t border-border/70 transition hover:bg-brand-muted/30"
+                        >
+                          <td className="px-5 py-3 font-mono text-muted-foreground">
+                            {i === 0 ? (
+                              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
+                                1
+                              </span>
+                            ) : (
+                              i + 1
+                            )}
+                          </td>
+                          <td className="px-5 py-3 font-medium">
+                            <PlayerLabel
+                              name={s.full_name ?? "Player"}
+                              avatarUrl={s.avatar_url}
+                              isYou={s.user_id === user?.id}
+                            />
+                          </td>
+                          <td className="px-5 py-3 text-right tabular-nums">{s.wins}</td>
+                          <td className="px-5 py-3 text-right tabular-nums">{s.top5s}</td>
+                          <td className="px-5 py-3 text-right font-mono text-base font-semibold tabular-nums text-success">
+                            {s.fedex_points.toFixed(1)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </SurfacePanel>
         </TabsContent>

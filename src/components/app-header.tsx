@@ -36,17 +36,19 @@ export function AppHeader() {
   const initials = initialsFromName(profile?.full_name, user?.email);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/80 bg-card/85 backdrop-blur-md supports-[backdrop-filter]:bg-card/70">
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:h-16 sm:px-6">
+    <header className="sticky top-0 z-40 border-b border-border/80 bg-card/85 pt-safe backdrop-blur-md supports-[backdrop-filter]:bg-card/70">
+      <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 sm:h-16 sm:gap-4 sm:px-6">
         <Link
           to="/"
-          className="group flex shrink-0 items-center gap-2.5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="group flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/25 transition group-hover:brightness-110">
             <Flag className="h-[18px] w-[18px]" />
           </span>
-          <span className="flex flex-col leading-none">
-            <span className="text-base font-bold tracking-tight text-foreground">WinHunters</span>
+          <span className="flex min-w-0 flex-col leading-none">
+            <span className="truncate text-base font-bold tracking-tight text-foreground">
+              WinHunters
+            </span>
             <span className="hidden text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:block">
               Fantasy golf
             </span>
@@ -66,13 +68,16 @@ export function AppHeader() {
           ) : null}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <div className="flex items-center gap-1 sm:hidden">
             <Button
               asChild
               variant={onLeagues ? "secondary" : "ghost"}
               size="sm"
-              className={cn(onLeagues && "bg-brand-muted text-accent-foreground")}
+              className={cn(
+                "h-10 min-w-10 px-3",
+                onLeagues && "bg-brand-muted text-accent-foreground",
+              )}
             >
               <Link to="/">Leagues</Link>
             </Button>
@@ -81,7 +86,10 @@ export function AppHeader() {
                 asChild
                 variant={onAdmin ? "secondary" : "ghost"}
                 size="sm"
-                className={cn(onAdmin && "bg-brand-muted text-accent-foreground")}
+                className={cn(
+                  "h-10 min-w-10 px-3",
+                  onAdmin && "bg-brand-muted text-accent-foreground",
+                )}
               >
                 <Link to="/admin">Admin</Link>
               </Button>
@@ -93,7 +101,7 @@ export function AppHeader() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 gap-2 border-border/80 bg-background/60 pl-1.5 pr-2.5"
+                className="h-10 gap-2 border-border/80 bg-background/60 pl-1.5 pr-2.5"
               >
                 <Avatar className="h-6 w-6">
                   {profile?.avatar_url ? (

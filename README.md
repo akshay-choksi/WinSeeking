@@ -213,7 +213,7 @@ docs/screenshots/   # README preview assets (optional local copies)
 
 - **Hosting:** see [`HOSTING.md`](HOSTING.md) for Lovable Free-plan limits, production redirects, live refresh behavior, and Cloudflare deployment.
 - **Friend beta:** follow [`FRIEND_BETA.md`](FRIEND_BETA.md) (OAuth allowlist, security migration, DataGolf ops, dry-run before invites).
-- **Live results:** members can request a live DataGolf refresh from an in-progress lineup. A two-minute tournament cooldown deduplicates requests; Realtime updates every open view.
+- **Live results:** members trigger a DataGolf refresh on sign-in, pull-to-refresh, or from an in-progress lineup. Realtime updates every open view.
 - **Sync performance win:** `sync-results` scores DraftKings Classic fantasy points in the Edge Function (mirroring SQL `compute_fantasy_points`), fetches DataGolf in-play + ESPN hole-by-hole tallies in parallel, and rolls up lineup totals from in-memory results — typically ~2–3s for 156 players on live Open data.
 - **Demo seed:** [`supabase/seed_weekend_golfers_demo.sql`](supabase/seed_weekend_golfers_demo.sql) can populate a sample league for UI demos — **do not** re-run on shared prod during friend beta.
 - Prefer not rewriting published git history on the Lovable-connected branch (no force-push / rebase of shared commits).

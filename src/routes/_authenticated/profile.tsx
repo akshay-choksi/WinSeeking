@@ -155,6 +155,7 @@ function ProfilePage() {
                 type="button"
                 variant="outline"
                 size="sm"
+                className="h-10"
                 onClick={() => fileRef.current?.click()}
                 disabled={saving}
               >
@@ -166,7 +167,7 @@ function ProfilePage() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="text-destructive hover:text-destructive"
+                  className="h-10 text-destructive hover:text-destructive"
                   onClick={() => {
                     setPendingFile(null);
                     setRemoveAvatar(true);

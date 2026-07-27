@@ -2,6 +2,8 @@ import { ClientOnly, createFileRoute, Outlet, redirect } from "@tanstack/react-r
 import { supabase } from "@/integrations/supabase/client";
 import { RouteShell } from "@/components/route-shell";
 import { AppHeader } from "@/components/app-header";
+import { PullToRefresh } from "@/components/pull-to-refresh";
+import { useLiveScoreRefresh } from "@/hooks/use-live-score-refresh";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -21,12 +23,19 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthedLayout() {
+  const { refreshing, refresh } = useLiveScoreRefresh({ onSignIn: true });
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       <AppHeader />
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        <Outlet />
-      </main>
+      <PullToRefresh
+        disabled={refreshing}
+        onRefresh={() => refresh("pull")}
+      >
+        <main className="mx-auto max-w-7xl px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-8">
+          <Outlet />
+        </main>
+      </PullToRefresh>
     </div>
   );
 }

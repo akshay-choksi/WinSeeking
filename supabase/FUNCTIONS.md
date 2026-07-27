@@ -40,9 +40,9 @@ Or run the SQL in `supabase/migrations/20260716182000_odds_pricing_fedex_scoring
 5. During the event, members can use **Refresh live scores** from a lineup, or an admin can force **Sync Results**.
 6. When the PGA event is final (DataGolf schedule / finished field), **Sync Results** (or **Sync Odds**) auto-finalizes season points. **Finalize Event** remains available as a manual fallback.
 
-Member refreshes require league membership and are deduplicated by a two-minute
-per-tournament cooldown in `result_sync_state`. One refresh updates every lineup
-for the tournament; Supabase Realtime updates other open views.
+Member refreshes require league membership. Sign-in and pull-to-refresh also
+trigger sync. One refresh updates every lineup for the tournament; Supabase
+Realtime updates other open views.
 
 **Performance:** fantasy points are computed in the Edge Function (DraftKings Classic
 formula, same as SQL `compute_fantasy_points`) so sync avoids ~150 sequential RPCs.

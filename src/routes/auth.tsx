@@ -55,7 +55,7 @@ function AuthPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-muted via-background to-muted px-4">
+    <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-brand-muted via-background to-muted px-4 pb-safe pt-safe">
       <Card className="w-full max-w-md gap-0 p-8 shadow-lg shadow-primary/5">
         <div className="mb-6 flex flex-col items-center text-center">
           <div className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/30">
