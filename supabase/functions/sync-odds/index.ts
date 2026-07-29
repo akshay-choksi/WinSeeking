@@ -273,7 +273,7 @@ Deno.serve(async (req) => {
       // leave historical golfers; prices table scopes the draft pool
     }
 
-    // Hybrid salaries from odds + DG preds + rank + form; field-only fallback $7k
+    // Hybrid salaries from odds + DG preds + rank + form; field-only fallback $6k
     const pricedInputs: HybridSalaryInput[] = [...golferIdByDg.keys()].map((dgId) => {
       const pred = predsByDg.get(dgId);
       const rank = ranksByDg.get(dgId);
@@ -327,11 +327,11 @@ Deno.serve(async (req) => {
         priceRows.push({
           tournament_id: tournamentId,
           golfer_id: golferId,
-          salary: 7000,
+          salary: 6000,
           decimal_odds: decimalOdds,
           implied_prob: null,
         });
-        await admin.from("golfers").update({ salary: 7000 }).eq("id", golferId);
+        await admin.from("golfers").update({ salary: 6000 }).eq("id", golferId);
       }
     }
 

@@ -516,8 +516,8 @@ export function computeHybridSalaries(
   players: HybridSalaryInput[],
   opts: { minSalary?: number; maxSalary?: number; step?: number; power?: number } = {},
 ): Map<string, HybridSalaryResult> {
-  const minSalary = opts.minSalary ?? 6000;
-  const maxSalary = opts.maxSalary ?? 12500;
+  const minSalary = opts.minSalary ?? 5000;
+  const maxSalary = opts.maxSalary ?? 11500;
   const step = opts.step ?? 100;
   const power = opts.power ?? HYBRID_CURVE_POWER;
 
