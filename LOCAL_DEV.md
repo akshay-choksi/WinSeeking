@@ -1,4 +1,4 @@
-# Run WinHunters locally
+# Run WinSeeking locally
 
 ## One-time setup
 1. Node 22+: `brew install node@22` (already done if you followed prior setup)
@@ -8,7 +8,7 @@
 
 ## Start the app
 ```bash
-cd /Users/akshay/Documents/win-hunter
+cd /Users/akshay/dev/winseeking
 export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
 npm run dev
 ```

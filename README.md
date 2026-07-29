@@ -1,4 +1,4 @@
-# WinHunters
+# WinSeeking
 
 Salary-cap fantasy golf for friends: pick 6 golfers under a $50,000 cap, score live tournament fantasy points, and race for season standings with Signature (1.5×) and Major (2×) multipliers.
 
@@ -65,7 +65,7 @@ The whole app is TypeScript end-to-end:
 
 ### Supabase features used
 
-| Feature                           | How WinHunters uses it                                                                                                    |
+| Feature                           | How WinSeeking uses it                                                                                                    |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | **Auth**                          | Google OAuth (and session cookies) for signed-in leagues                                                                  |
 | **Postgres**                      | Leagues, members, tournaments, golfers, prices, lineups, results, season standings                                        |
@@ -94,14 +94,14 @@ Headshots use the PGA Tour Cloudinary CDN keyed by `player_num` (DataGolf does n
 
 - **Node.js 22+**
 - npm
-- A Supabase project (this repo is typically linked to the hosted WinHunters project)
+- A Supabase project (this repo is typically linked to the hosted WinSeeking project)
 - Optional: [Supabase CLI](https://supabase.com/docs/guides/cli) for migrations / function deploy
 - Optional: DataGolf API key for odds/results sync
 
 ### 1. Install
 
 ```bash
-cd win-hunter
+cd winseeking
 npm install
 ```
 

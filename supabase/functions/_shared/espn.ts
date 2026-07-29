@@ -215,7 +215,7 @@ export async function fetchEspnHoleStatsMap(
     const res = await fetch(
       "https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard",
       {
-        headers: { "User-Agent": "WinHunters/1.0" },
+        headers: { "User-Agent": "WinSeeking/1.0" },
       },
     );
     if (!res.ok) return map;

@@ -51,12 +51,13 @@ WHERE p.id = u.id AND u.email = 'you@example.com';
 
 ## 2. Production OAuth (required — manual)
 
-1. In Lovable, **Publish** and copy the production URL (e.g. `https://….lovable.app`).
+1. In Lovable, rename the project slug to **winseeking** if needed, **Publish**, and copy the production URL (target `https://winseeking.lovable.app`).
 2. Supabase → [Auth → URL Configuration](https://supabase.com/dashboard/project/lkfdqzjoeigiwakhtsig/auth/url-configuration):
-   - **Site URL** — set to the Lovable production URL (or keep preview and add redirects).
+   - **Site URL** — set to `https://winseeking.lovable.app` (or your current Lovable host).
    - **Redirect URLs** — add:
-     - `https://YOUR-LOVABLE-HOST/**`
-     - `https://YOUR-LOVABLE-HOST/auth`
+     - `https://winseeking.lovable.app/**`
+     - `https://winseeking.lovable.app/auth`
+     - Keep any previous Lovable host until DNS/clients cut over.
      - Keep localhost entries for local dev ([LOCAL_DEV.md](LOCAL_DEV.md)).
 3. Google Cloud Console → OAuth client → allow the same origin / redirect URI.
 4. Incognito on a second device: prod URL → Continue with Google → land on `/`.
@@ -106,7 +107,7 @@ supabase db query --linked -f supabase/reset_3m_for_live_odds.sql --yes
 Copy/paste:
 
 ```
-WinHunters fantasy golf — Friend Beta
+WinSeeking fantasy golf — Friend Beta
 
 1. Open: <PASTE_LOVABLE_URL>
 2. Sign in with Google

@@ -1,9 +1,10 @@
-# Hosting WinHunters
+# Hosting WinSeeking
 
 ## Recommended friend-beta path: Lovable
 
 This repository is connected to Lovable. Publish from the Lovable editor and
-share the resulting `lovable.app` URL.
+share the resulting URL (target: `https://winseeking.lovable.app` after renaming
+the Lovable project / publish slug).
 
 Publishing itself is free. A published app stays live, but production usage
 consumes Lovable Cloud Run credits. The Free workspace currently includes a

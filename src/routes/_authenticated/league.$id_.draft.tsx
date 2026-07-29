@@ -497,7 +497,7 @@ function DraftPage() {
                   : `$${remaining.toLocaleString()}`}
               </div>
             </div>
-            <div className="hidden sm:block">
+            <div>
               <div className="text-[10px] uppercase tracking-wide text-slate-400">Avg Rem</div>
               <div
                 className={`font-mono text-lg font-bold ${

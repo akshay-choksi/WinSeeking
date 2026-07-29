@@ -11,7 +11,7 @@ export const Route = createFileRoute("/auth")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Sign in — WinHunters" },
+      { title: "Sign in — WinSeeking" },
       { name: "description", content: "Sign in to your fantasy golf salary cap league." },
     ],
   }),
@@ -61,7 +61,7 @@ function AuthPage() {
           <div className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/30">
             <Flag className="h-7 w-7" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">WinHunters</h1>
+          <h1 className="text-2xl font-bold tracking-tight">WinSeeking</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Fantasy golf salary cap pools with your crew.
           </p>

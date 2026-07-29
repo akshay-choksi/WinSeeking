@@ -81,19 +81,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         name: "viewport",
         content: "width=device-width, initial-scale=1, viewport-fit=cover",
       },
-      { title: "WinHunters — Fantasy Golf Salary Pool" },
+      { title: "WinSeeking — Fantasy Golf Salary Pool" },
       {
         name: "description",
         content:
           "Draft golfers, stay under the salary cap, and win your fantasy golf league in real time.",
       },
-      { name: "author", content: "WinHunters" },
+      { name: "author", content: "WinSeeking" },
       { name: "theme-color", content: "#1a9b63" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "default" },
-      { name: "apple-mobile-web-app-title", content: "WinHunters" },
+      { name: "apple-mobile-web-app-title", content: "WinSeeking" },
       { name: "mobile-web-app-capable", content: "yes" },
-      { property: "og:title", content: "WinHunters — Fantasy Golf Salary Pool" },
+      { property: "og:title", content: "WinSeeking — Fantasy Golf Salary Pool" },
       {
         property: "og:description",
         content:
@@ -101,7 +101,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "WinHunters — Fantasy Golf Salary Pool" },
+      { name: "twitter:title", content: "WinSeeking — Fantasy Golf Salary Pool" },
       { name: "twitter:description", content: "Draft golfers, stay under the salary cap, and win your fantasy golf league in real time." },
       { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/8d18e390-976d-4cdf-b883-92321a79eb1c" },
       { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/8d18e390-976d-4cdf-b883-92321a79eb1c" },

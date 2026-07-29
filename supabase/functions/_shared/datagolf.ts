@@ -1,4 +1,4 @@
-// Shared helpers for WinHunters edge functions (Deno)
+// Shared helpers for WinSeeking edge functions (Deno)
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 export const corsHeaders: Record<string, string> = {

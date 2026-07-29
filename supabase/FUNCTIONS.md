@@ -1,4 +1,4 @@
-# WinHunters — Odds & Scoring Setup
+# WinSeeking — Odds & Scoring Setup
 
 ## DataGolf API key
 

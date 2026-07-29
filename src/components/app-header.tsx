@@ -47,7 +47,7 @@ export function AppHeader() {
           </span>
           <span className="flex min-w-0 flex-col leading-none">
             <span className="truncate text-base font-bold tracking-tight text-foreground">
-              WinHunters
+              WinSeeking
             </span>
             <span className="hidden text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:block">
               Fantasy golf
