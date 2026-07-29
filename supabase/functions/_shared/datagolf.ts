@@ -276,30 +276,342 @@ export function extractDecimalOdds(row: Record<string, unknown>): number | null 
   return values[Math.floor(values.length / 2)];
 }
 
+/** Hybrid salary weights: market / course-win / rank / form. */
+export const HYBRID_WEIGHTS = {
+  market: 0.4,
+  courseWin: 0.35,
+  rank: 0.15,
+  form: 0.1,
+} as const;
+
+export const HYBRID_CURVE_POWER = 0.45;
+
+export type HybridSalaryInput = {
+  dgId: string;
+  decimalOdds?: number | null;
+  /** Course-history + fit model win probability (0–1). */
+  courseWinProb?: number | null;
+  /** Baseline make-cut probability (0–1). */
+  makeCutProb?: number | null;
+  /** Baseline top-5 probability (0–1). */
+  top5Prob?: number | null;
+  owgrRank?: number | null;
+  dgRank?: number | null;
+};
+
+export type HybridSalaryResult = {
+  salary: number;
+  impliedProb: number | null;
+  decimalOdds: number | null;
+  composite: number;
+};
+
+function asFiniteNumber(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string" && raw.trim() !== "") {
+    const n = Number(raw.replace(/[^\d.+-eE]/g, ""));
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/** Normalize DG percent/prob fields to 0–1 (accepts 0–1 or 0–100). */
+export function normalizeProb(raw: unknown): number | null {
+  const n = asFiniteNumber(raw);
+  if (n == null || n < 0) return null;
+  if (n > 1 && n <= 100) return n / 100;
+  if (n > 100) return null; // likely odds, not a probability
+  return n;
+}
+
+function pickProb(row: Record<string, unknown>, keys: string[]): number | null {
+  for (const key of keys) {
+    if (key in row) {
+      const p = normalizeProb(row[key]);
+      if (p != null) return p;
+    }
+  }
+  return null;
+}
+
+function extractDgId(row: Record<string, unknown>): string | null {
+  const raw = row.dg_id ?? row.dgId ?? row.player_id;
+  if (raw == null || raw === "") return null;
+  return String(raw);
+}
+
+function listFromUnknown(raw: unknown, keys: string[]): Record<string, unknown>[] {
+  if (Array.isArray(raw)) return raw as Record<string, unknown>[];
+  if (!raw || typeof raw !== "object") return [];
+  const obj = raw as Record<string, unknown>;
+  for (const key of keys) {
+    if (Array.isArray(obj[key])) return obj[key] as Record<string, unknown>[];
+  }
+  return [];
+}
+
+export type PreTournamentPlayer = {
+  dgId: string;
+  courseWinProb: number | null;
+  makeCutProb: number | null;
+  top5Prob: number | null;
+};
+
+/**
+ * Parse `/preds/pre-tournament` into per-player course-win + baseline form signals.
+ * Handles common DG shapes: `{ baseline, baseline_history_fit }`, nested `preds`, or a flat list.
+ */
+export function parsePreTournamentPreds(raw: unknown): Map<string, PreTournamentPlayer> {
+  const out = new Map<string, PreTournamentPlayer>();
+
+  const ensure = (dgId: string): PreTournamentPlayer => {
+    let row = out.get(dgId);
+    if (!row) {
+      row = { dgId, courseWinProb: null, makeCutProb: null, top5Prob: null };
+      out.set(dgId, row);
+    }
+    return row;
+  };
+
+  const applyBaseline = (rows: Record<string, unknown>[]) => {
+    for (const row of rows) {
+      const dgId = extractDgId(row);
+      if (!dgId) continue;
+      const dest = ensure(dgId);
+      dest.makeCutProb =
+        pickProb(row, ["make_cut", "make_cut_prob", "mc", "mc_prob", "make cut"]) ?? dest.makeCutProb;
+      dest.top5Prob = pickProb(row, ["top_5", "top5", "top_5_prob", "top 5"]) ?? dest.top5Prob;
+      // If only one model blob exists, also use its win as course fallback later.
+      if (dest.courseWinProb == null) {
+        dest.courseWinProb = pickProb(row, ["win", "win_prob", "win_probability"]);
+      }
+    }
+  };
+
+  const applyCourse = (rows: Record<string, unknown>[]) => {
+    for (const row of rows) {
+      const dgId = extractDgId(row);
+      if (!dgId) continue;
+      const dest = ensure(dgId);
+      dest.courseWinProb =
+        pickProb(row, ["win", "win_prob", "win_probability"]) ?? dest.courseWinProb;
+      // Form prefers baseline; use course-model cut/top5 only as fallback.
+      dest.makeCutProb =
+        dest.makeCutProb ??
+        pickProb(row, ["make_cut", "make_cut_prob", "mc", "mc_prob", "make cut"]);
+      dest.top5Prob =
+        dest.top5Prob ?? pickProb(row, ["top_5", "top5", "top_5_prob", "top 5"]);
+    }
+  };
+
+  if (!raw || typeof raw !== "object") return out;
+  const obj = raw as Record<string, unknown>;
+
+  const baselineKeys = ["baseline", "baseline_model", "model_baseline"];
+  const courseKeys = [
+    "baseline_history_fit",
+    "baseline_history",
+    "history_fit",
+    "course_history_fit",
+    "baseline_plus_history",
+    "model_history_fit",
+  ];
+
+  let foundSplit = false;
+  for (const key of baselineKeys) {
+    const rows = listFromUnknown(obj[key], []);
+    if (rows.length > 0) {
+      applyBaseline(rows);
+      foundSplit = true;
+    }
+  }
+  for (const key of courseKeys) {
+    const rows = listFromUnknown(obj[key], []);
+    if (rows.length > 0) {
+      applyCourse(rows);
+      foundSplit = true;
+    }
+  }
+
+  if (!foundSplit) {
+    // Nested preds object, or flat player list with optional `model` field.
+    const nested = obj.preds ?? obj.predictions ?? obj.data ?? obj.players;
+    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+      return parsePreTournamentPreds(nested);
+    }
+    const rows = listFromUnknown(raw, ["preds", "predictions", "data", "players", "field"]);
+    if (rows.length === 0) return out;
+
+    const byModel = new Map<string, Record<string, unknown>[]>();
+    for (const row of rows) {
+      const model = String(row.model ?? row.model_name ?? row.pred_model ?? "unknown").toLowerCase();
+      const list = byModel.get(model) ?? [];
+      list.push(row);
+      byModel.set(model, list);
+    }
+
+    if (byModel.size <= 1) {
+      applyBaseline(rows);
+      applyCourse(rows);
+    } else {
+      for (const [model, list] of byModel) {
+        if (model.includes("history") || model.includes("course") || model.includes("fit")) {
+          applyCourse(list);
+        } else if (model.includes("baseline") || model === "unknown") {
+          applyBaseline(list);
+        } else {
+          applyBaseline(list);
+        }
+      }
+    }
+  }
+
+  return out;
+}
+
+export type DgRankingPlayer = {
+  dgId: string;
+  dgRank: number | null;
+  owgrRank: number | null;
+};
+
+/** Parse `/preds/get-dg-rankings` into dg_id → ranks. */
+export function parseDgRankings(raw: unknown): Map<string, DgRankingPlayer> {
+  const out = new Map<string, DgRankingPlayer>();
+  const rows = listFromUnknown(raw, ["rankings", "data", "players", "dg_rankings"]);
+  for (const row of rows) {
+    const dgId = extractDgId(row);
+    if (!dgId) continue;
+    const dgRank = asFiniteNumber(row.dg_rank ?? row.rank ?? row.datagolf_rank);
+    const owgrRank = asFiniteNumber(row.owgr_rank ?? row.owgr);
+    out.set(dgId, {
+      dgId,
+      dgRank: dgRank != null && dgRank > 0 ? Math.trunc(dgRank) : null,
+      owgrRank: owgrRank != null && owgrRank > 0 ? Math.trunc(owgrRank) : null,
+    });
+  }
+  return out;
+}
+
+function maxNormalize(values: Map<string, number>): Map<string, number> {
+  let max = 0;
+  for (const v of values.values()) {
+    if (v > max) max = v;
+  }
+  const out = new Map<string, number>();
+  if (max <= 0) {
+    for (const id of values.keys()) out.set(id, 0);
+    return out;
+  }
+  for (const [id, v] of values) out.set(id, v / max);
+  return out;
+}
+
+/**
+ * Hybrid salaries: blend market odds, DG course-win, OWGR/DG rank, and form (make-cut/top-5).
+ * Missing components renormalize remaining weights. Players with zero signals are omitted
+ * (caller should fall back to a default salary).
+ */
+export function computeHybridSalaries(
+  players: HybridSalaryInput[],
+  opts: { minSalary?: number; maxSalary?: number; step?: number; power?: number } = {},
+): Map<string, HybridSalaryResult> {
+  const minSalary = opts.minSalary ?? 6000;
+  const maxSalary = opts.maxSalary ?? 12500;
+  const step = opts.step ?? 100;
+  const power = opts.power ?? HYBRID_CURVE_POWER;
+
+  const marketRaw = new Map<string, number>();
+  const courseRaw = new Map<string, number>();
+  const rankRaw = new Map<string, number>();
+  const formRaw = new Map<string, number>();
+  const oddsById = new Map<string, number>();
+
+  for (const p of players) {
+    if (p.decimalOdds != null && Number.isFinite(p.decimalOdds) && p.decimalOdds > 1) {
+      marketRaw.set(p.dgId, 1 / p.decimalOdds);
+      oddsById.set(p.dgId, p.decimalOdds);
+    }
+    if (p.courseWinProb != null && p.courseWinProb > 0) {
+      courseRaw.set(p.dgId, p.courseWinProb);
+    }
+    const ranks = [p.owgrRank, p.dgRank].filter((r): r is number => r != null && r > 0);
+    if (ranks.length > 0) {
+      const best = Math.min(...ranks);
+      rankRaw.set(p.dgId, 1 / best);
+    }
+    const makeCut = p.makeCutProb;
+    const top5 = p.top5Prob;
+    if (makeCut != null || top5 != null) {
+      const mc = makeCut ?? 0;
+      const t5 = top5 ?? 0;
+      // Prefer make-cut when only one exists; otherwise 0.6 / 0.4 blend.
+      const form =
+        makeCut != null && top5 != null ? 0.6 * mc + 0.4 * t5 : makeCut != null ? mc : t5;
+      if (form > 0) formRaw.set(p.dgId, form);
+    }
+  }
+
+  const marketN = maxNormalize(marketRaw);
+  const courseN = maxNormalize(courseRaw);
+  const rankN = maxNormalize(rankRaw);
+  const formN = maxNormalize(formRaw);
+
+  const marketSum = [...marketRaw.values()].reduce((s, v) => s + v, 0) || 1;
+
+  const composites = new Map<string, number>();
+  for (const p of players) {
+    const parts: { w: number; v: number }[] = [];
+    if (marketN.has(p.dgId)) parts.push({ w: HYBRID_WEIGHTS.market, v: marketN.get(p.dgId)! });
+    if (courseN.has(p.dgId)) parts.push({ w: HYBRID_WEIGHTS.courseWin, v: courseN.get(p.dgId)! });
+    if (rankN.has(p.dgId)) parts.push({ w: HYBRID_WEIGHTS.rank, v: rankN.get(p.dgId)! });
+    if (formN.has(p.dgId)) parts.push({ w: HYBRID_WEIGHTS.form, v: formN.get(p.dgId)! });
+    if (parts.length === 0) continue;
+    const wSum = parts.reduce((s, x) => s + x.w, 0) || 1;
+    const composite = parts.reduce((s, x) => s + (x.w / wSum) * x.v, 0);
+    composites.set(p.dgId, composite);
+  }
+
+  if (composites.size === 0) return new Map();
+
+  let maxC = 0;
+  for (const v of composites.values()) {
+    if (v > maxC) maxC = v;
+  }
+  if (maxC <= 0) maxC = 1e-9;
+
+  const out = new Map<string, HybridSalaryResult>();
+  for (const [dgId, composite] of composites) {
+    const relative = composite / maxC;
+    const ratio = Math.pow(relative, power);
+    let salary = minSalary + (maxSalary - minSalary) * ratio;
+    salary = Math.round(salary / step) * step;
+    salary = Math.min(maxSalary, Math.max(minSalary, salary));
+
+    const decimalOdds = oddsById.get(dgId) ?? null;
+    const impliedProb = decimalOdds != null ? (1 / decimalOdds) / marketSum : null;
+
+    out.set(dgId, { salary, impliedProb, decimalOdds, composite });
+  }
+  return out;
+}
+
+/** @deprecated Prefer computeHybridSalaries — kept as market-only hybrid wrapper. */
 export function oddsToSalaries(
   players: { dgId: string; decimalOdds: number }[],
   opts: { minSalary?: number; maxSalary?: number; step?: number } = {},
 ): Map<string, { salary: number; impliedProb: number; decimalOdds: number }> {
-  const minSalary = opts.minSalary ?? 6000;
-  const maxSalary = opts.maxSalary ?? 12500;
-  const step = opts.step ?? 100;
-
-  const impliedRaw = players.map((p) => ({
-    dgId: p.dgId,
-    decimalOdds: p.decimalOdds,
-    implied: 1 / p.decimalOdds,
-  }));
-  const sum = impliedRaw.reduce((s, p) => s + p.implied, 0) || 1;
-  const maxP = Math.max(...impliedRaw.map((p) => p.implied / sum), 1e-9);
-
+  const hybrid = computeHybridSalaries(
+    players.map((p) => ({ dgId: p.dgId, decimalOdds: p.decimalOdds })),
+    opts,
+  );
   const out = new Map<string, { salary: number; impliedProb: number; decimalOdds: number }>();
-  for (const p of impliedRaw) {
-    const impliedProb = p.implied / sum;
-    const ratio = Math.sqrt(impliedProb / maxP);
-    let salary = minSalary + (maxSalary - minSalary) * ratio;
-    salary = Math.round(salary / step) * step;
-    salary = Math.min(maxSalary, Math.max(minSalary, salary));
-    out.set(p.dgId, { salary, impliedProb, decimalOdds: p.decimalOdds });
+  for (const [dgId, row] of hybrid) {
+    out.set(dgId, {
+      salary: row.salary,
+      impliedProb: row.impliedProb ?? 0,
+      decimalOdds: row.decimalOdds ?? players.find((p) => p.dgId === dgId)!.decimalOdds,
+    });
   }
   return out;
 }

@@ -1,15 +1,18 @@
 import {
   adminClient,
   classifyEvent,
+  computeHybridSalaries,
   corsHeaders,
   dgFetch,
   earliestTeeLockAt,
   extractDecimalOdds,
   jsonResponse,
   multiplierForEventType,
-  oddsToSalaries,
+  parseDgRankings,
+  parsePreTournamentPreds,
   requireAdmin,
   thursdayLockAt,
+  type HybridSalaryInput,
 } from "../_shared/datagolf.ts";
 import { finalizeTournament, mapScheduleStatus } from "../_shared/finalize.ts";
 
@@ -108,19 +111,32 @@ Deno.serve(async (req) => {
       tournamentsUpserted += 1;
     }
 
-    // 2) Current field + outrights for active PGA event
-    const [fieldRaw, outrightsRaw] = await Promise.all([
+    // 2) Current field + outrights + model feeds for hybrid salaries
+    const [fieldRaw, outrightsRaw, predsRaw, rankingsRaw] = await Promise.all([
       dgFetch<unknown>("/field-updates", { tour: "pga" }),
       dgFetch<unknown>("/betting-tools/outrights", {
         tour: "pga",
         market: "win",
         odds_format: "decimal",
       }),
+      dgFetch<unknown>("/preds/pre-tournament", {
+        tour: "pga",
+        odds_format: "percent",
+      }).catch((err) => {
+        console.warn("pre-tournament preds unavailable:", err);
+        return null;
+      }),
+      dgFetch<unknown>("/preds/get-dg-rankings", {}).catch((err) => {
+        console.warn("dg rankings unavailable:", err);
+        return null;
+      }),
     ]);
 
     const fieldMeta = extractFieldMeta(fieldRaw);
     const fieldPlayers = extractFieldPlayers(fieldRaw);
     const oddsRows = extractOddsRows(outrightsRaw);
+    const predsByDg = predsRaw ? parsePreTournamentPreds(predsRaw) : new Map();
+    const ranksByDg = rankingsRaw ? parseDgRankings(rankingsRaw) : new Map();
 
     if (!fieldMeta.eventId && !fieldMeta.eventName) {
       return jsonResponse({
@@ -207,6 +223,7 @@ Deno.serve(async (req) => {
 
     // Upsert golfers from field
     const golferIdByDg = new Map<string, string>();
+    const owgrByDg = new Map<string, number>();
     let golfersUpserted = 0;
     for (const p of fieldPlayers) {
       const dgId = String(p.dg_id ?? "");
@@ -216,6 +233,7 @@ Deno.serve(async (req) => {
 
       const pgaPlayerNum = extractPgaPlayerNum(p);
       const owgrRank = extractOwgrRank(p);
+      if (owgrRank != null) owgrByDg.set(dgId, owgrRank);
       const meta = {
         name,
         is_active: true,
@@ -255,12 +273,23 @@ Deno.serve(async (req) => {
       // leave historical golfers; prices table scopes the draft pool
     }
 
-    // Players with odds; fallback for field-only: mid salary
-    const pricedInputs = [...golferIdByDg.keys()]
-      .filter((dgId) => oddsByDg.has(dgId))
-      .map((dgId) => ({ dgId, decimalOdds: oddsByDg.get(dgId)! }));
+    // Hybrid salaries from odds + DG preds + rank + form; field-only fallback $7k
+    const pricedInputs: HybridSalaryInput[] = [...golferIdByDg.keys()].map((dgId) => {
+      const pred = predsByDg.get(dgId);
+      const rank = ranksByDg.get(dgId);
+      const fieldOwgr = owgrByDg.get(dgId) ?? null;
+      return {
+        dgId,
+        decimalOdds: oddsByDg.get(dgId) ?? null,
+        courseWinProb: pred?.courseWinProb ?? null,
+        makeCutProb: pred?.makeCutProb ?? null,
+        top5Prob: pred?.top5Prob ?? null,
+        owgrRank: fieldOwgr ?? rank?.owgrRank ?? null,
+        dgRank: rank?.dgRank ?? null,
+      };
+    });
 
-    const salaryMap = oddsToSalaries(pricedInputs);
+    const salaryMap = computeHybridSalaries(pricedInputs);
     const priceRows: {
       tournament_id: string;
       golfer_id: string;
@@ -269,15 +298,28 @@ Deno.serve(async (req) => {
       implied_prob: number | null;
     }[] = [];
 
+    let withOdds = 0;
+    let withPreds = 0;
+    let withRank = 0;
+    for (const input of pricedInputs) {
+      if (input.decimalOdds != null) withOdds += 1;
+      if (input.courseWinProb != null || input.makeCutProb != null || input.top5Prob != null) {
+        withPreds += 1;
+      }
+      if (input.owgrRank != null || input.dgRank != null) withRank += 1;
+    }
+
     for (const [dgId, golferId] of golferIdByDg) {
       const priced = salaryMap.get(dgId);
+      const decimalOdds = oddsByDg.get(dgId) ?? priced?.decimalOdds ?? null;
       if (priced) {
         priceRows.push({
           tournament_id: tournamentId,
           golfer_id: golferId,
           salary: priced.salary,
-          decimal_odds: priced.decimalOdds,
-          implied_prob: Number(priced.impliedProb.toFixed(6)),
+          decimal_odds: decimalOdds,
+          implied_prob:
+            priced.impliedProb != null ? Number(priced.impliedProb.toFixed(6)) : null,
         });
         // Keep legacy golfers.salary in sync for older UI paths
         await admin.from("golfers").update({ salary: priced.salary }).eq("id", golferId);
@@ -286,7 +328,7 @@ Deno.serve(async (req) => {
           tournament_id: tournamentId,
           golfer_id: golferId,
           salary: 7000,
-          decimal_odds: null,
+          decimal_odds: decimalOdds,
           implied_prob: null,
         });
         await admin.from("golfers").update({ salary: 7000 }).eq("id", golferId);
@@ -301,14 +343,17 @@ Deno.serve(async (req) => {
     }
 
     return jsonResponse({
-      message: `Synced ${fieldMeta.eventName ?? "event"}: ${golfersUpserted} golfers, ${priceRows.length} prices.`,
+      message: `Synced ${fieldMeta.eventName ?? "event"}: ${golfersUpserted} golfers, ${priceRows.length} prices (hybrid).`,
       tournamentId,
       eventName: fieldMeta.eventName,
       activeStatus,
       tournamentsUpserted,
       golfersUpserted,
       pricesUpserted: priceRows.length,
-      withOdds: salaryMap.size,
+      pricedHybrid: salaryMap.size,
+      withOdds,
+      withPreds,
+      withRank,
       scheduleCompleted: scheduleEvents.filter((e) => mapScheduleStatus(e) === "completed").length,
     });
   } catch (err) {

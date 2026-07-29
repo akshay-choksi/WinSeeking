@@ -35,7 +35,7 @@ Or run the SQL in `supabase/migrations/20260716182000_odds_pricing_fedex_scoring
 
 1. Ensure your user has `profiles.is_admin = true`.
 2. Open `/admin`.
-3. **Sync Tournament Odds** — schedule + field + salaries for the active PGA event.
+3. **Sync Tournament Odds** — schedule + field + **hybrid salaries** (market odds + DataGolf course-win preds + OWGR/DG rank + form) for the active PGA event.
 4. Members draft lineups before Thursday lock.
 5. During the event, members can use **Refresh live scores** from a lineup, or an admin can force **Sync Results**.
 6. When the PGA event is final (DataGolf schedule / finished field), **Sync Results** (or **Sync Odds**) auto-finalizes season points. **Finalize Event** remains available as a manual fallback.
