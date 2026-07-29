@@ -517,15 +517,15 @@ function maxNormalize(values: Map<string, number>): Map<string, number> {
  * Missing components renormalize remaining weights. Players with zero signals are omitted
  * (caller should fall back to a default salary).
  *
- * Maps relative composite through a mild convex curve into [$6.5k, $11k] (~$4.5k spread)
+ * Maps relative composite through a mild convex curve into [$7k, $11.5k] (~$4.5k spread)
  * so top favorites are disadvantageous but playable, and stacked chalk exceeds the $50k cap.
  */
 export function computeHybridSalaries(
   players: HybridSalaryInput[],
   opts: { minSalary?: number; maxSalary?: number; step?: number; power?: number } = {},
 ): Map<string, HybridSalaryResult> {
-  const minSalary = opts.minSalary ?? 6500;
-  const maxSalary = opts.maxSalary ?? 11000;
+  const minSalary = opts.minSalary ?? 7000;
+  const maxSalary = opts.maxSalary ?? 11500;
   const step = opts.step ?? 100;
   const power = opts.power ?? HYBRID_CURVE_POWER;
 
