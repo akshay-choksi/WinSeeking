@@ -31,6 +31,8 @@ supabase db push
 
 Or run the SQL in `supabase/migrations/20260716182000_odds_pricing_fedex_scoring.sql` in the SQL editor.
 
+Also apply later security migrations (friend beta + `20260729120000_lovable_security_hardening.sql`) the same way.
+
 ## Admin workflow
 
 1. Ensure your user has `profiles.is_admin = true`.

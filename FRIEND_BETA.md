@@ -15,6 +15,8 @@ Do **not** re-run `supabase/seed_weekend_golfers_demo.sql` or `supabase/seed_3m_
 | Step | Status |
 | ---- | ------ |
 | Security migration (`friend_beta_security`) | Done |
+| Lovable hardening (`lovable_security_hardening`) | Done — applied on prod |
+| Leaked password protection (HIBP) | **You** — Auth → Email → Prevent leaked passwords (Pro) |
 | Admin nav gated + `join_league_by_invite` | Done (on `main`) |
 | Edge functions + `DATAGOLF_API_KEY` | Done |
 | DK Classic / ESPN live scoring | Done |
@@ -46,6 +48,18 @@ SET is_admin = true
 FROM auth.users u
 WHERE p.id = u.id AND u.email = 'you@example.com';
 ```
+
+Apply the latest hardening migration (`lovable_security_hardening`) via `supabase db push` or the SQL editor.
+
+### Leaked password protection (manual — Pro plan)
+
+Lovable flags this when HaveIBeenPwned checks are off. Enable in the dashboard (not migratable via SQL):
+
+1. Open [Auth → Providers → Email](https://supabase.com/dashboard/project/lkfdqzjoeigiwakhtsig/auth/providers?provider=Email)
+2. Turn on **Prevent use of leaked passwords**
+3. Save
+
+Requires Supabase **Pro** (or an entitlement that includes `password_hibp`). Free-tier projects cannot clear this warning in-app.
 
 ---
 

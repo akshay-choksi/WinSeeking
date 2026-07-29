@@ -26,13 +26,6 @@ function AdminPage() {
     setIsAdmin(null);
     setAccessError(null);
 
-    // Prefer SECURITY DEFINER RPC (avoids RLS edge cases on profiles).
-    const { data: rpcAdmin, error: rpcError } = await supabase.rpc("am_i_admin");
-    if (!rpcError) {
-      setIsAdmin(rpcAdmin === true);
-      return;
-    }
-
     const { data, error } = await supabase
       .from("profiles")
       .select("is_admin")
@@ -40,7 +33,7 @@ function AdminPage() {
       .maybeSingle();
 
     if (error) {
-      setAccessError(`${rpcError.message} | fallback: ${error.message}`);
+      setAccessError(error.message);
       setIsAdmin(false);
       return;
     }

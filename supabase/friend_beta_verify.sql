@@ -16,6 +16,17 @@ SELECT 'no_public_league_select', NOT EXISTS (
   SELECT 1 FROM pg_policy
   WHERE polrelid = 'public.leagues'::regclass
     AND polname = 'Leagues: any auth can lookup by invite'
+)
+UNION ALL
+SELECT 'trigger_fns_private',
+  to_regprocedure('private.add_league_creator_as_member()') IS NOT NULL
+  AND to_regprocedure('private.enforce_lineup_lock()') IS NOT NULL
+  AND to_regprocedure('private.handle_new_user()') IS NOT NULL
+UNION ALL
+SELECT 'avatars_no_public_list', NOT EXISTS (
+  SELECT 1 FROM pg_policy
+  WHERE polrelid = 'storage.objects'::regclass
+    AND polname = 'Avatars: public read'
 );
 
 -- 2) Operator admin
