@@ -286,10 +286,10 @@ export const HYBRID_WEIGHTS = {
 
 /**
  * Salary curve exponent on relative composite (0–1).
- * Values > 1 create tiers: elites stay expensive, mid/longshots drop toward the floor
- * so a $50k / 6-golfer lineup can usually afford only one stud.
+ * Slightly above 1 gives mild tiers: favorites cost more with small within-tier
+ * stagger, without turning modest odds gaps into multi-thousand salary jumps.
  */
-export const HYBRID_CURVE_POWER = 1.85;
+export const HYBRID_CURVE_POWER = 1.2;
 
 export type HybridSalaryInput = {
   dgId: string;
@@ -517,15 +517,15 @@ function maxNormalize(values: Map<string, number>): Map<string, number> {
  * Missing components renormalize remaining weights. Players with zero signals are omitted
  * (caller should fall back to a default salary).
  *
- * Maps relative composite through a convex power curve into [$6k, $14k] so top talent is
- * scarce under a $50k cap while longshots stay as value plays (not dirt-cheap).
+ * Maps relative composite through a mild convex curve into [$6.5k, $11k] (~$4.5k spread)
+ * so top favorites are disadvantageous but playable, and stacked chalk exceeds the $50k cap.
  */
 export function computeHybridSalaries(
   players: HybridSalaryInput[],
   opts: { minSalary?: number; maxSalary?: number; step?: number; power?: number } = {},
 ): Map<string, HybridSalaryResult> {
-  const minSalary = opts.minSalary ?? 6000;
-  const maxSalary = opts.maxSalary ?? 14000;
+  const minSalary = opts.minSalary ?? 6500;
+  const maxSalary = opts.maxSalary ?? 11000;
   const step = opts.step ?? 100;
   const power = opts.power ?? HYBRID_CURVE_POWER;
 

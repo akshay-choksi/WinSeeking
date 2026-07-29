@@ -82,7 +82,7 @@ Edge functions call DataGolf feeds (Scratch Plus key required), including:
 - `/get-schedule` — PGA schedule + completed/upcoming status
 - `/field-updates` — active field, tee times, OWGR, PGA `player_num` (for headshots)
 - `/betting-tools/outrights` — market win odds (hybrid salary input)
-- `/preds/pre-tournament` + `/preds/get-dg-rankings` — course-win / form / rank blended with odds → tiered salaries ($6k–$14k)
+- `/preds/pre-tournament` + `/preds/get-dg-rankings` — course-win / form / rank blended with odds → tiered salaries ($6.5k–$11k)
 - `/preds/in-play` (+ optional live hole stats) — live positions / scores → fantasy points
 
 Headshots use the PGA Tour Cloudinary CDN keyed by `player_num` (DataGolf does not serve images).
