@@ -150,6 +150,7 @@ export type Tournament = {
   fedex_multiplier: number;
   status: TournamentStatus;
   lineup_lock_at: string | null;
+  last_completed_round?: number | null;
 };
 
 /** Infer major / signature from event name (mirrors edge classifyEvent). */

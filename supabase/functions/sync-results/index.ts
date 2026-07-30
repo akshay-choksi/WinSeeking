@@ -401,6 +401,29 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Advance day-leader round marker (never moves backward).
+    {
+      const inferred = inferLastCompletedRound(resultRows.map((r) => r.rounds));
+      const completedRoundToStore =
+        tournament.status === "completed" || autoFinalized
+          ? Math.max(inferred ?? 0, 4)
+          : inferred;
+      if (completedRoundToStore != null && completedRoundToStore >= 1) {
+        const { data: existingT } = await admin
+          .from("tournaments")
+          .select("last_completed_round")
+          .eq("id", tournament.id)
+          .maybeSingle();
+        const prev = Number(existingT?.last_completed_round ?? 0);
+        if (completedRoundToStore > prev) {
+          await admin
+            .from("tournaments")
+            .update({ last_completed_round: Math.min(4, completedRoundToStore) })
+            .eq("id", tournament.id);
+        }
+      }
+    }
+
     const baseMessage = `Synced results for ${tournament.name}: ${resultRows.length} players, ${lineupIds.length} lineups.`;
     return jsonResponse({
       message: finalizeMessage ? `${baseMessage} ${finalizeMessage}` : baseMessage,
@@ -445,6 +468,45 @@ function extractInPlayPlayers(raw: unknown): InPlayPlayer[] {
     }
   }
   return [];
+}
+
+function hasRoundScore(raw: unknown): boolean {
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) return true;
+  if (typeof raw === "string") {
+    const t = raw.trim().toUpperCase();
+    if (!t || t === "-" || t === "E" || t === "WD" || t === "DQ" || t === "CUT") return false;
+    const n = Number(t);
+    return Number.isFinite(n) && n > 0;
+  }
+  return false;
+}
+
+/**
+ * Infer the latest fully played round from in-play round blobs.
+ * Round N counts as complete when ≥40% of the field has RN, or any later round score exists.
+ */
+function inferLastCompletedRound(
+  roundsList: { r1: unknown; r2: unknown; r3: unknown; r4: unknown; thru: unknown }[],
+): number | null {
+  if (roundsList.length === 0) return null;
+  const n = roundsList.length;
+  const threshold = Math.max(1, Math.ceil(n * 0.4));
+  const counts = [0, 0, 0, 0];
+
+  for (const rounds of roundsList) {
+    if (hasRoundScore(rounds.r1)) counts[0] += 1;
+    if (hasRoundScore(rounds.r2)) counts[1] += 1;
+    if (hasRoundScore(rounds.r3)) counts[2] += 1;
+    if (hasRoundScore(rounds.r4)) counts[3] += 1;
+  }
+
+  let last: number | null = null;
+  for (let round = 1; round <= 4; round++) {
+    const idx = round - 1;
+    const laterHas = counts.slice(idx + 1).some((c) => c >= threshold);
+    if (counts[idx] >= threshold || laterHas) last = round;
+  }
+  return last;
 }
 
 async function scheduleMarksCompleted(dgEventId: string, seasonYear: number): Promise<boolean> {

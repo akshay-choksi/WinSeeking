@@ -127,6 +127,48 @@ export type Database = {
         }
         Relationships: []
       }
+      league_day_leader_dismissals: {
+        Row: {
+          completed_round: number
+          dismissed_at: string
+          id: string
+          league_id: string
+          tournament_id: string
+          user_id: string
+        }
+        Insert: {
+          completed_round: number
+          dismissed_at?: string
+          id?: string
+          league_id: string
+          tournament_id: string
+          user_id: string
+        }
+        Update: {
+          completed_round?: number
+          dismissed_at?: string
+          id?: string
+          league_id?: string
+          tournament_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "league_day_leader_dismissals_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "league_day_leader_dismissals_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lineup_entries: {
         Row: {
           created_at: string
@@ -445,6 +487,7 @@ export type Database = {
           event_type: Database["public"]["Enums"]["tournament_event_type"]
           fedex_multiplier: number
           id: string
+          last_completed_round: number | null
           lineup_lock_at: string | null
           name: string
           season_year: number
@@ -459,6 +502,7 @@ export type Database = {
           event_type?: Database["public"]["Enums"]["tournament_event_type"]
           fedex_multiplier?: number
           id?: string
+          last_completed_round?: number | null
           lineup_lock_at?: string | null
           name: string
           season_year: number
@@ -473,6 +517,7 @@ export type Database = {
           event_type?: Database["public"]["Enums"]["tournament_event_type"]
           fedex_multiplier?: number
           id?: string
+          last_completed_round?: number | null
           lineup_lock_at?: string | null
           name?: string
           season_year?: number

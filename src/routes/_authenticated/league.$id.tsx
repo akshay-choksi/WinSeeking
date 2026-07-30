@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trophy, ArrowLeft, Zap, Medal, Eye, Copy } from "lucide-react";
+import { Trophy, ArrowLeft, Zap, Medal, Eye, Copy, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   isLineupLocked,
@@ -20,6 +20,7 @@ import {
   formatEventSeasonPtsLabel,
   type Tournament,
 } from "@/lib/scoring";
+import { pickDayLeaderQuote } from "@/lib/day-leader-quotes";
 import { initialsFromName } from "@/lib/profile";
 import { PageHeader } from "@/components/page-header";
 import { SurfacePanel } from "@/components/surface-panel";
@@ -94,6 +95,7 @@ function LeaguePage() {
   const [selectedTournamentId, setSelectedTournamentId] = useState<string | null>(null);
   const [eventStandings, setEventStandings] = useState<EventStanding[]>([]);
   const [seasonStandings, setSeasonStandings] = useState<SeasonStanding[]>([]);
+  const [showDayLeaderBanner, setShowDayLeaderBanner] = useState(false);
   const seasonYear = useMemo(() => new Date().getFullYear(), []);
 
   async function loadLeague() {
@@ -109,7 +111,7 @@ function LeaguePage() {
     const { data } = await supabase
       .from("tournaments")
       .select(
-        "id, dg_event_id, name, start_date, end_date, season_year, event_type, fedex_multiplier, status, lineup_lock_at",
+        "id, dg_event_id, name, start_date, end_date, season_year, event_type, fedex_multiplier, status, lineup_lock_at, last_completed_round",
       )
       .order("start_date", { ascending: false })
       .limit(40);
@@ -278,6 +280,63 @@ function LeaguePage() {
   const locked = selectedTournament ? isLineupLocked(selectedTournament) : false;
   const leaderPts = eventStandings[0]?.total_points;
   const yourStanding = eventStandings.find((s) => s.user_id === user?.id);
+  const dayLeaderRound = selectedTournament?.last_completed_round ?? null;
+  const dayLeader = eventStandings[0] ?? null;
+  const dayLeaderTied =
+    !!dayLeader &&
+    eventStandings.length > 1 &&
+    eventStandings[1]!.total_points === dayLeader.total_points;
+  const dayLeaderQuote =
+    dayLeaderRound != null && dayLeaderRound >= 1 && selectedTournament
+      ? pickDayLeaderQuote(id, selectedTournament.id, dayLeaderRound)
+      : null;
+
+  useEffect(() => {
+    let cancelled = false;
+    async function checkDayLeaderBanner() {
+      if (
+        !user ||
+        !selectedTournament ||
+        dayLeaderRound == null ||
+        dayLeaderRound < 1 ||
+        !dayLeader
+      ) {
+        if (!cancelled) setShowDayLeaderBanner(false);
+        return;
+      }
+      const { data } = await supabase
+        .from("league_day_leader_dismissals")
+        .select("id")
+        .eq("league_id", id)
+        .eq("tournament_id", selectedTournament.id)
+        .eq("user_id", user.id)
+        .eq("completed_round", dayLeaderRound)
+        .maybeSingle();
+      if (!cancelled) setShowDayLeaderBanner(!data);
+    }
+    void checkDayLeaderBanner();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, id, selectedTournament?.id, dayLeaderRound, dayLeader?.user_id]);
+
+  async function dismissDayLeaderBanner() {
+    if (!user || !selectedTournament || dayLeaderRound == null || dayLeaderRound < 1) return;
+    setShowDayLeaderBanner(false);
+    const { error } = await supabase.from("league_day_leader_dismissals").upsert(
+      {
+        league_id: id,
+        tournament_id: selectedTournament.id,
+        user_id: user.id,
+        completed_round: dayLeaderRound,
+      },
+      { onConflict: "league_id,tournament_id,user_id,completed_round" },
+    );
+    if (error) {
+      setShowDayLeaderBanner(true);
+      toast.error("Could not dismiss", { description: error.message });
+    }
+  }
 
   async function copyInvite() {
     if (!league?.invite_code) return;
@@ -348,6 +407,29 @@ function LeaguePage() {
               )
             }
           />
+
+          {showDayLeaderBanner && dayLeader && dayLeaderRound != null && dayLeaderQuote && (
+            <div className="relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-card p-4 shadow-sm sm:p-5">
+              <button
+                type="button"
+                onClick={() => void dismissDayLeaderBanner()}
+                className="absolute right-3 top-3 rounded-full p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                aria-label="Dismiss day leader banner"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <p className="pr-8 text-xs font-semibold uppercase tracking-wide text-primary">
+                After Round {dayLeaderRound}
+              </p>
+              <p className="mt-1 pr-8 text-lg font-semibold tracking-tight text-foreground">
+                {dayLeader.full_name ?? "Player"}
+                {dayLeaderTied ? " (tied)" : ""} leads the league
+              </p>
+              <p className="mt-2 max-w-2xl text-sm italic text-muted-foreground">
+                “{dayLeaderQuote}”
+              </p>
+            </div>
+          )}
 
           <div className="grid gap-3 sm:grid-cols-3">
             <StatCard
