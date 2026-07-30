@@ -6,6 +6,7 @@ import { useLiveScoreRefresh, useOnLiveScoresUpdated } from "@/hooks/use-live-sc
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Lock, RefreshCw } from "lucide-react";
 import { GolferAvatar } from "@/components/golfer-avatar";
+import { GolferInfoButton } from "@/components/golfer-info";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   breakdownFantasyPoints,
@@ -30,6 +31,27 @@ type GolferRow = {
   decimal_odds: number | null;
   pga_player_num: string | null;
   owgr_rank: number | null;
+  dg_rank: number | null;
+  country: string | null;
+  is_amateur: boolean | null;
+  model_win_prob: number | null;
+  model_make_cut_prob: number | null;
+  model_top5_prob: number | null;
+  bio_extract: string | null;
+  bio_url: string | null;
+  bio_source: string | null;
+  bio_fetched_at: string | null;
+  birth_place: string | null;
+  age: number | null;
+  college: string | null;
+  handedness: string | null;
+  season_events: number | null;
+  season_cuts: number | null;
+  season_top10s: number | null;
+  season_wins: number | null;
+  season_earnings: string | null;
+  fedex_points: number | null;
+  fedex_rank: number | null;
   position: number | null;
   total_to_par: number | null;
   fantasy_points: number;
@@ -65,6 +87,38 @@ function formatPts(n: number): string {
   if (n === 0) return "0";
   const rounded = Number.isInteger(n) ? String(n) : n.toFixed(1);
   return n > 0 ? `+${rounded}` : rounded;
+}
+
+function toGolferInfo(r: GolferRow) {
+  return {
+    id: r.golfer_id,
+    name: r.name,
+    pga_player_num: r.pga_player_num,
+    owgr_rank: r.owgr_rank,
+    dg_rank: r.dg_rank,
+    country: r.country,
+    is_amateur: r.is_amateur,
+    salary: r.salary,
+    decimal_odds: r.decimal_odds,
+    model_win_prob: r.model_win_prob,
+    model_make_cut_prob: r.model_make_cut_prob,
+    model_top5_prob: r.model_top5_prob,
+    birth_place: r.birth_place,
+    age: r.age,
+    college: r.college,
+    handedness: r.handedness,
+    bio_extract: r.bio_extract,
+    bio_url: r.bio_url,
+    bio_source: r.bio_source,
+    bio_fetched_at: r.bio_fetched_at,
+    season_events: r.season_events,
+    season_cuts: r.season_cuts,
+    season_top10s: r.season_top10s,
+    season_wins: r.season_wins,
+    season_earnings: r.season_earnings,
+    fedex_points: r.fedex_points,
+    fedex_rank: r.fedex_rank,
+  };
 }
 
 /** Display count + points for hole/place breakdown cells. */
@@ -210,7 +264,9 @@ function LineupViewerPage() {
 
     const { data: entries } = await supabase
       .from("lineup_entries")
-      .select("golfer_id, golfers(id, name, pga_player_num, owgr_rank)")
+      .select(
+        "golfer_id, golfers(id, name, pga_player_num, owgr_rank, dg_rank, country, is_amateur, bio_extract, bio_url, bio_source, bio_fetched_at, birth_place, age, college, handedness, season_events, season_cuts, season_top10s, season_wins, season_earnings, fedex_points, fedex_rank)",
+      )
       .eq("lineup_id", lineup.id);
 
     const golferIds = (entries ?? []).map((e) => e.golfer_id);
@@ -219,11 +275,20 @@ function LineupViewerPage() {
       golferIds.length
         ? supabase
             .from("player_prices")
-            .select("golfer_id, salary, decimal_odds")
+            .select(
+              "golfer_id, salary, decimal_odds, model_win_prob, model_make_cut_prob, model_top5_prob",
+            )
             .eq("tournament_id", active.id)
             .in("golfer_id", golferIds)
         : Promise.resolve({
-            data: [] as { golfer_id: string; salary: number; decimal_odds: number | null }[],
+            data: [] as {
+              golfer_id: string;
+              salary: number;
+              decimal_odds: number | null;
+              model_win_prob: number | null;
+              model_make_cut_prob: number | null;
+              model_top5_prob: number | null;
+            }[],
           }),
       golferIds.length
         ? supabase
@@ -262,6 +327,24 @@ function LineupViewerPage() {
         name: string;
         pga_player_num: string | null;
         owgr_rank: number | null;
+        dg_rank: number | null;
+        country: string | null;
+        is_amateur: boolean | null;
+        bio_extract: string | null;
+        bio_url: string | null;
+        bio_source: string | null;
+        bio_fetched_at: string | null;
+        birth_place: string | null;
+        age: number | null;
+        college: string | null;
+        handedness: string | null;
+        season_events: number | null;
+        season_cuts: number | null;
+        season_top10s: number | null;
+        season_wins: number | null;
+        season_earnings: string | null;
+        fedex_points: number | null;
+        fedex_rank: number | null;
       } | null;
       const price = priceById.get(e.golfer_id);
       const res = resultById.get(e.golfer_id);
@@ -272,6 +355,27 @@ function LineupViewerPage() {
         decimal_odds: price?.decimal_odds ?? null,
         pga_player_num: g?.pga_player_num ?? null,
         owgr_rank: g?.owgr_rank ?? null,
+        dg_rank: g?.dg_rank ?? null,
+        country: g?.country ?? null,
+        is_amateur: g?.is_amateur ?? null,
+        model_win_prob: price?.model_win_prob ?? null,
+        model_make_cut_prob: price?.model_make_cut_prob ?? null,
+        model_top5_prob: price?.model_top5_prob ?? null,
+        bio_extract: g?.bio_extract ?? null,
+        bio_url: g?.bio_url ?? null,
+        bio_source: g?.bio_source ?? null,
+        bio_fetched_at: g?.bio_fetched_at ?? null,
+        birth_place: g?.birth_place ?? null,
+        age: g?.age ?? null,
+        college: g?.college ?? null,
+        handedness: g?.handedness ?? null,
+        season_events: g?.season_events ?? null,
+        season_cuts: g?.season_cuts ?? null,
+        season_top10s: g?.season_top10s ?? null,
+        season_wins: g?.season_wins ?? null,
+        season_earnings: g?.season_earnings ?? null,
+        fedex_points: g?.fedex_points ?? null,
+        fedex_rank: g?.fedex_rank ?? null,
         position: res?.position ?? null,
         total_to_par: res?.total_to_par ?? null,
         fantasy_points: Number(res?.fantasy_points ?? 0),
@@ -470,7 +574,10 @@ function LineupViewerPage() {
                     <div className="flex items-start gap-3">
                       <GolferAvatar name={r.name} pgaPlayerNum={r.pga_player_num} />
                       <div className="min-w-0 flex-1">
-                        <div className="font-medium text-slate-900">{r.name}</div>
+                        <div className="flex items-center gap-1">
+                          <div className="font-medium text-slate-900">{r.name}</div>
+                          <GolferInfoButton golfer={toGolferInfo(r)} />
+                        </div>
                         <div className="text-xs text-slate-500">
                           {formatAmericanOdds(r.decimal_odds)} · {formatOwgr(r.owgr_rank)}
                         </div>
@@ -562,7 +669,10 @@ function LineupViewerPage() {
                           <div className="flex items-center gap-3">
                             <GolferAvatar name={r.name} pgaPlayerNum={r.pga_player_num} />
                             <div className="min-w-0">
-                              <div className="font-medium text-slate-900">{r.name}</div>
+                              <div className="flex items-center gap-1">
+                                <div className="font-medium text-slate-900">{r.name}</div>
+                                <GolferInfoButton golfer={toGolferInfo(r)} />
+                              </div>
                               <div className="text-xs text-slate-500">
                                 {formatAmericanOdds(r.decimal_odds)} · {formatOwgr(r.owgr_rank)}
                               </div>

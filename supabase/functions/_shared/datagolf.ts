@@ -498,6 +498,39 @@ export function parseDgRankings(raw: unknown): Map<string, DgRankingPlayer> {
   return out;
 }
 
+export type DgPlayerListEntry = {
+  dgId: string;
+  country: string | null;
+  isAmateur: boolean | null;
+};
+
+/** Parse `/get-player-list` into dg_id → country / amateur. */
+export function parsePlayerList(raw: unknown): Map<string, DgPlayerListEntry> {
+  const out = new Map<string, DgPlayerListEntry>();
+  const rows = listFromUnknown(raw, ["players", "data", "player_list"]);
+  for (const row of rows) {
+    const dgId = extractDgId(row);
+    if (!dgId) continue;
+    const countryRaw = row.country ?? row.nation ?? row.nationality;
+    const country =
+      typeof countryRaw === "string" && countryRaw.trim()
+        ? countryRaw.trim().toUpperCase()
+        : null;
+    const amRaw = row.amateur ?? row.is_amateur ?? row.ama;
+    let isAmateur: boolean | null = null;
+    if (typeof amRaw === "boolean") isAmateur = amRaw;
+    else if (typeof amRaw === "string") {
+      const s = amRaw.trim().toLowerCase();
+      if (s === "1" || s === "true" || s === "yes" || s === "y") isAmateur = true;
+      else if (s === "0" || s === "false" || s === "no" || s === "n") isAmateur = false;
+    } else if (typeof amRaw === "number") {
+      isAmateur = amRaw !== 0;
+    }
+    out.set(dgId, { dgId, country, isAmateur });
+  }
+  return out;
+}
+
 function maxNormalize(values: Map<string, number>): Map<string, number> {
   let max = 0;
   for (const v of values.values()) {

@@ -31,38 +31,98 @@ export type Database = {
       }
       golfers: {
         Row: {
+          age: number | null
+          bio_extract: string | null
+          bio_fetched_at: string | null
+          bio_source: string | null
+          bio_url: string | null
+          birth_place: string | null
+          college: string | null
+          country: string | null
           created_at: string
           dg_player_id: string | null
+          dg_rank: number | null
+          espn_athlete_id: string | null
+          fedex_points: number | null
+          fedex_rank: number | null
+          handedness: string | null
           id: string
           is_active: boolean
+          is_amateur: boolean | null
           name: string
           owgr_rank: number | null
           pga_player_num: string | null
           salary: number
+          season_cuts: number | null
+          season_earnings: string | null
+          season_events: number | null
+          season_top10s: number | null
+          season_wins: number | null
+          stats_fetched_at: string | null
           tournament_name: string | null
           updated_at: string
         }
         Insert: {
+          age?: number | null
+          bio_extract?: string | null
+          bio_fetched_at?: string | null
+          bio_source?: string | null
+          bio_url?: string | null
+          birth_place?: string | null
+          college?: string | null
+          country?: string | null
           created_at?: string
           dg_player_id?: string | null
+          dg_rank?: number | null
+          espn_athlete_id?: string | null
+          fedex_points?: number | null
+          fedex_rank?: number | null
+          handedness?: string | null
           id?: string
           is_active?: boolean
+          is_amateur?: boolean | null
           name: string
           owgr_rank?: number | null
           pga_player_num?: string | null
           salary?: number
+          season_cuts?: number | null
+          season_earnings?: string | null
+          season_events?: number | null
+          season_top10s?: number | null
+          season_wins?: number | null
+          stats_fetched_at?: string | null
           tournament_name?: string | null
           updated_at?: string
         }
         Update: {
+          age?: number | null
+          bio_extract?: string | null
+          bio_fetched_at?: string | null
+          bio_source?: string | null
+          bio_url?: string | null
+          birth_place?: string | null
+          college?: string | null
+          country?: string | null
           created_at?: string
           dg_player_id?: string | null
+          dg_rank?: number | null
+          espn_athlete_id?: string | null
+          fedex_points?: number | null
+          fedex_rank?: number | null
+          handedness?: string | null
           id?: string
           is_active?: boolean
+          is_amateur?: boolean | null
           name?: string
           owgr_rank?: number | null
           pga_player_num?: string | null
           salary?: number
+          season_cuts?: number | null
+          season_earnings?: string | null
+          season_events?: number | null
+          season_top10s?: number | null
+          season_wins?: number | null
+          stats_fetched_at?: string | null
           tournament_name?: string | null
           updated_at?: string
         }
@@ -262,6 +322,9 @@ export type Database = {
           decimal_odds: number | null
           golfer_id: string
           implied_prob: number | null
+          model_make_cut_prob: number | null
+          model_top5_prob: number | null
+          model_win_prob: number | null
           salary: number
           tournament_id: string
           updated_at: string
@@ -271,6 +334,9 @@ export type Database = {
           decimal_odds?: number | null
           golfer_id: string
           implied_prob?: number | null
+          model_make_cut_prob?: number | null
+          model_top5_prob?: number | null
+          model_win_prob?: number | null
           salary?: number
           tournament_id: string
           updated_at?: string
@@ -280,6 +346,9 @@ export type Database = {
           decimal_odds?: number | null
           golfer_id?: string
           implied_prob?: number | null
+          model_make_cut_prob?: number | null
+          model_top5_prob?: number | null
+          model_win_prob?: number | null
           salary?: number
           tournament_id?: string
           updated_at?: string

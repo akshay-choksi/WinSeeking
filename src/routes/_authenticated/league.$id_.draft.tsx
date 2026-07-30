@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Plus, X, Search, Lock, ArrowLeft, Eye } from "lucide-react";
 import { GolferAvatar } from "@/components/golfer-avatar";
+import { GolferInfoButton } from "@/components/golfer-info";
 import {
   formatAmericanOdds,
   isLineupLocked,
@@ -28,6 +29,27 @@ type Golfer = {
   decimal_odds: number | null;
   pga_player_num: string | null;
   owgr_rank: number | null;
+  dg_rank: number | null;
+  country: string | null;
+  is_amateur: boolean | null;
+  model_win_prob: number | null;
+  model_make_cut_prob: number | null;
+  model_top5_prob: number | null;
+  bio_extract: string | null;
+  bio_url: string | null;
+  bio_source: string | null;
+  bio_fetched_at: string | null;
+  birth_place: string | null;
+  age: number | null;
+  college: string | null;
+  handedness: string | null;
+  season_events: number | null;
+  season_cuts: number | null;
+  season_top10s: number | null;
+  season_wins: number | null;
+  season_earnings: string | null;
+  fedex_points: number | null;
+  fedex_rank: number | null;
 };
 
 function formatOwgr(rank: number | null | undefined): string {
@@ -86,7 +108,9 @@ function DraftPage() {
 
       const { data: prices } = await supabase
         .from("player_prices")
-        .select("salary, decimal_odds, golfers(id, name, pga_player_num, owgr_rank)")
+        .select(
+          "salary, decimal_odds, model_win_prob, model_make_cut_prob, model_top5_prob, golfers(id, name, pga_player_num, owgr_rank, dg_rank, country, is_amateur, bio_extract, bio_url, bio_source, bio_fetched_at, birth_place, age, college, handedness, season_events, season_cuts, season_top10s, season_wins, season_earnings, fedex_points, fedex_rank)",
+        )
         .eq("tournament_id", active.id)
         .order("salary", { ascending: false });
 
@@ -97,6 +121,24 @@ function DraftPage() {
             name: string;
             pga_player_num: string | null;
             owgr_rank: number | null;
+            dg_rank: number | null;
+            country: string | null;
+            is_amateur: boolean | null;
+            bio_extract: string | null;
+            bio_url: string | null;
+            bio_source: string | null;
+            bio_fetched_at: string | null;
+            birth_place: string | null;
+            age: number | null;
+            college: string | null;
+            handedness: string | null;
+            season_events: number | null;
+            season_cuts: number | null;
+            season_top10s: number | null;
+            season_wins: number | null;
+            season_earnings: string | null;
+            fedex_points: number | null;
+            fedex_rank: number | null;
           } | null;
           if (!g) return null;
           return {
@@ -106,9 +148,30 @@ function DraftPage() {
             decimal_odds: row.decimal_odds,
             pga_player_num: g.pga_player_num,
             owgr_rank: g.owgr_rank,
-          };
+            dg_rank: g.dg_rank,
+            country: g.country,
+            is_amateur: g.is_amateur,
+            model_win_prob: row.model_win_prob,
+            model_make_cut_prob: row.model_make_cut_prob,
+            model_top5_prob: row.model_top5_prob,
+            bio_extract: g.bio_extract,
+            bio_url: g.bio_url,
+            bio_source: g.bio_source,
+            bio_fetched_at: g.bio_fetched_at,
+            birth_place: g.birth_place,
+            age: g.age,
+            college: g.college,
+            handedness: g.handedness,
+            season_events: g.season_events,
+            season_cuts: g.season_cuts,
+            season_top10s: g.season_top10s,
+            season_wins: g.season_wins,
+            season_earnings: g.season_earnings,
+            fedex_points: g.fedex_points,
+            fedex_rank: g.fedex_rank,
+          } satisfies Golfer;
         })
-        .filter((g): g is Golfer => !!g);
+        .filter((g): g is Golfer => g != null);
 
       setGolfers(pool);
       setLoading(false);
@@ -129,18 +192,28 @@ function DraftPage() {
         setLineupId(lineup.id);
         const { data: entries } = await supabase
           .from("lineup_entries")
-          .select("golfer_id, golfers(id, name, pga_player_num, owgr_rank)")
+          .select(
+            "golfer_id, golfers(id, name, pga_player_num, owgr_rank, dg_rank, country, is_amateur, bio_extract, bio_url, bio_source, bio_fetched_at, birth_place, age, college, handedness, season_events, season_cuts, season_top10s, season_wins, season_earnings, fedex_points, fedex_rank)",
+          )
           .eq("lineup_id", lineup.id);
 
         const { data: prices } = await supabase
           .from("player_prices")
-          .select("golfer_id, salary, decimal_odds")
+          .select(
+            "golfer_id, salary, decimal_odds, model_win_prob, model_make_cut_prob, model_top5_prob",
+          )
           .eq("tournament_id", tournament.id);
 
         const priceById = new Map(
           (prices ?? []).map((p) => [
             p.golfer_id,
-            { salary: p.salary, decimal_odds: p.decimal_odds },
+            {
+              salary: p.salary,
+              decimal_odds: p.decimal_odds,
+              model_win_prob: p.model_win_prob,
+              model_make_cut_prob: p.model_make_cut_prob,
+              model_top5_prob: p.model_top5_prob,
+            },
           ]),
         );
 
@@ -151,6 +224,24 @@ function DraftPage() {
               name: string;
               pga_player_num: string | null;
               owgr_rank: number | null;
+              dg_rank: number | null;
+              country: string | null;
+              is_amateur: boolean | null;
+              bio_extract: string | null;
+              bio_url: string | null;
+              bio_source: string | null;
+              bio_fetched_at: string | null;
+              birth_place: string | null;
+              age: number | null;
+              college: string | null;
+              handedness: string | null;
+              season_events: number | null;
+              season_cuts: number | null;
+              season_top10s: number | null;
+              season_wins: number | null;
+              season_earnings: string | null;
+              fedex_points: number | null;
+              fedex_rank: number | null;
             } | null;
             if (!g) return null;
             const price = priceById.get(g.id);
@@ -161,6 +252,27 @@ function DraftPage() {
               decimal_odds: price?.decimal_odds ?? null,
               pga_player_num: g.pga_player_num,
               owgr_rank: g.owgr_rank,
+              dg_rank: g.dg_rank,
+              country: g.country,
+              is_amateur: g.is_amateur,
+              model_win_prob: price?.model_win_prob ?? null,
+              model_make_cut_prob: price?.model_make_cut_prob ?? null,
+              model_top5_prob: price?.model_top5_prob ?? null,
+              bio_extract: g.bio_extract,
+              bio_url: g.bio_url,
+              bio_source: g.bio_source,
+              bio_fetched_at: g.bio_fetched_at,
+              birth_place: g.birth_place,
+              age: g.age,
+              college: g.college,
+              handedness: g.handedness,
+              season_events: g.season_events,
+              season_cuts: g.season_cuts,
+              season_top10s: g.season_top10s,
+              season_wins: g.season_wins,
+              season_earnings: g.season_earnings,
+              fedex_points: g.fedex_points,
+              fedex_rank: g.fedex_rank,
             } satisfies Golfer;
           })
           .filter((g): g is Golfer => !!g);
@@ -356,7 +468,10 @@ function DraftPage() {
             <div key={g.id} className="flex items-center gap-3 border-b px-4 py-3 last:border-b-0">
               <GolferAvatar name={g.name} pgaPlayerNum={g.pga_player_num} />
               <div className="min-w-0 flex-1">
-                <div className="truncate font-semibold text-slate-900">{g.name}</div>
+                <div className="flex items-center gap-1">
+                  <div className="truncate font-semibold text-slate-900">{g.name}</div>
+                  <GolferInfoButton golfer={g} />
+                </div>
                 <div className="text-xs text-slate-500">
                   {formatAmericanOdds(g.decimal_odds)} · {formatOwgr(g.owgr_rank)}
                 </div>
@@ -430,7 +545,10 @@ function DraftPage() {
                       <div className="flex items-center gap-3">
                         <GolferAvatar name={g.name} pgaPlayerNum={g.pga_player_num} />
                         <div className="min-w-0">
-                          <div className="truncate font-medium text-slate-900">{g.name}</div>
+                          <div className="flex items-center gap-1">
+                            <div className="truncate font-medium text-slate-900">{g.name}</div>
+                            <GolferInfoButton golfer={g} />
+                          </div>
                           <div className="text-xs text-slate-500">
                             <span className="sm:hidden">
                               {formatAmericanOdds(g.decimal_odds)} ·{" "}
@@ -472,7 +590,10 @@ function DraftPage() {
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-700 bg-slate-900 text-white pb-safe">
+      <div
+        data-draft-footer
+        className="fixed inset-x-0 bottom-0 z-[60] border-t border-slate-700 bg-slate-900 text-white pb-safe"
+      >
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
           <div className="flex min-w-0 flex-1 flex-wrap gap-x-5 gap-y-2">
             <div>

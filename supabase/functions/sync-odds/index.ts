@@ -9,6 +9,7 @@ import {
   jsonResponse,
   multiplierForEventType,
   parseDgRankings,
+  parsePlayerList,
   parsePreTournamentPreds,
   requireAdmin,
   thursdayLockAt,
@@ -111,8 +112,8 @@ Deno.serve(async (req) => {
       tournamentsUpserted += 1;
     }
 
-    // 2) Current field + outrights + model feeds for hybrid salaries
-    const [fieldRaw, outrightsRaw, predsRaw, rankingsRaw] = await Promise.all([
+    // 2) Current field + outrights + model feeds for hybrid salaries + player meta
+    const [fieldRaw, outrightsRaw, predsRaw, rankingsRaw, playerListRaw] = await Promise.all([
       dgFetch<unknown>("/field-updates", { tour: "pga" }),
       dgFetch<unknown>("/betting-tools/outrights", {
         tour: "pga",
@@ -130,6 +131,10 @@ Deno.serve(async (req) => {
         console.warn("dg rankings unavailable:", err);
         return null;
       }),
+      dgFetch<unknown>("/get-player-list", {}).catch((err) => {
+        console.warn("player list unavailable:", err);
+        return null;
+      }),
     ]);
 
     const fieldMeta = extractFieldMeta(fieldRaw);
@@ -137,6 +142,7 @@ Deno.serve(async (req) => {
     const oddsRows = extractOddsRows(outrightsRaw);
     const predsByDg = predsRaw ? parsePreTournamentPreds(predsRaw) : new Map();
     const ranksByDg = rankingsRaw ? parseDgRankings(rankingsRaw) : new Map();
+    const playerListByDg = playerListRaw ? parsePlayerList(playerListRaw) : new Map();
 
     if (!fieldMeta.eventId && !fieldMeta.eventName) {
       return jsonResponse({
@@ -234,12 +240,17 @@ Deno.serve(async (req) => {
       const pgaPlayerNum = extractPgaPlayerNum(p);
       const owgrRank = extractOwgrRank(p);
       if (owgrRank != null) owgrByDg.set(dgId, owgrRank);
-      const meta = {
+      const listMeta = playerListByDg.get(dgId);
+      const rankMeta = ranksByDg.get(dgId);
+      const meta: Record<string, unknown> = {
         name,
         is_active: true,
         tournament_name: fieldMeta.eventName,
         ...(pgaPlayerNum ? { pga_player_num: pgaPlayerNum } : {}),
         ...(owgrRank != null ? { owgr_rank: owgrRank } : {}),
+        ...(listMeta?.country ? { country: listMeta.country } : {}),
+        ...(listMeta?.isAmateur != null ? { is_amateur: listMeta.isAmateur } : {}),
+        ...(rankMeta?.dgRank != null ? { dg_rank: rankMeta.dgRank } : {}),
       };
 
       const { data: existing } = await admin
@@ -296,6 +307,9 @@ Deno.serve(async (req) => {
       salary: number;
       decimal_odds: number | null;
       implied_prob: number | null;
+      model_win_prob: number | null;
+      model_make_cut_prob: number | null;
+      model_top5_prob: number | null;
     }[] = [];
 
     let withOdds = 0;
@@ -312,6 +326,12 @@ Deno.serve(async (req) => {
     for (const [dgId, golferId] of golferIdByDg) {
       const priced = salaryMap.get(dgId);
       const decimalOdds = oddsByDg.get(dgId) ?? priced?.decimalOdds ?? null;
+      const pred = predsByDg.get(dgId);
+      const modelWin =
+        pred?.courseWinProb != null ? Number(pred.courseWinProb.toFixed(6)) : null;
+      const modelMakeCut =
+        pred?.makeCutProb != null ? Number(pred.makeCutProb.toFixed(6)) : null;
+      const modelTop5 = pred?.top5Prob != null ? Number(pred.top5Prob.toFixed(6)) : null;
       if (priced) {
         priceRows.push({
           tournament_id: tournamentId,
@@ -320,6 +340,9 @@ Deno.serve(async (req) => {
           decimal_odds: decimalOdds,
           implied_prob:
             priced.impliedProb != null ? Number(priced.impliedProb.toFixed(6)) : null,
+          model_win_prob: modelWin,
+          model_make_cut_prob: modelMakeCut,
+          model_top5_prob: modelTop5,
         });
         // Keep legacy golfers.salary in sync for older UI paths
         await admin.from("golfers").update({ salary: priced.salary }).eq("id", golferId);
@@ -330,6 +353,9 @@ Deno.serve(async (req) => {
           salary: 8000,
           decimal_odds: decimalOdds,
           implied_prob: null,
+          model_win_prob: modelWin,
+          model_make_cut_prob: modelMakeCut,
+          model_top5_prob: modelTop5,
         });
         await admin.from("golfers").update({ salary: 8000 }).eq("id", golferId);
       }

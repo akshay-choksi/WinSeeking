@@ -8,7 +8,12 @@ import {
   parseToPar,
   requireUser,
 } from "../_shared/datagolf.ts";
-import { fetchEspnHoleStatsMap, lookupHoleStats } from "../_shared/espn.ts";
+import {
+  fetchEspnAthleteIdMap,
+  fetchEspnHoleStatsMap,
+  lookupHoleStats,
+  normalizePlayerName,
+} from "../_shared/espn.ts";
 import { detectEventFinal, finalizeTournament, mapScheduleStatus } from "../_shared/finalize.ts";
 
 type InPlayPlayer = Record<string, unknown>;
@@ -195,7 +200,7 @@ Deno.serve(async (req) => {
 
     const { data: golfers, error: golfersError } = await admin
       .from("golfers")
-      .select("id, dg_player_id")
+      .select("id, dg_player_id, name, espn_athlete_id")
       .in("dg_player_id", dgIds);
     if (golfersError) throw new Error(golfersError.message);
 
@@ -248,6 +253,26 @@ Deno.serve(async (req) => {
           if (inserted) golferByDg.set(dgId, inserted.id);
         }
       }
+    }
+
+    // Best-effort: attach ESPN athlete ids for bio enrich / profile facts
+    try {
+      const espnIds = await fetchEspnAthleteIdMap(tournament.name);
+      if (espnIds.size > 0) {
+        const { data: namedGolfers } = await admin
+          .from("golfers")
+          .select("id, name, espn_athlete_id")
+          .in("id", [...golferByDg.values()]);
+        for (const g of namedGolfers ?? []) {
+          if (g.espn_athlete_id) continue;
+          const key = normalizePlayerName(String(g.name ?? ""));
+          const ref = espnIds.get(key);
+          if (!ref) continue;
+          await admin.from("golfers").update({ espn_athlete_id: ref.athleteId }).eq("id", g.id);
+        }
+      }
+    } catch (err) {
+      console.warn("espn athlete id map failed:", err);
     }
 
     const resultRows: {
