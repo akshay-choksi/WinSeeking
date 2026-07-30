@@ -81,6 +81,14 @@ export async function refreshLiveScores(
   const { data, error } = await supabase.functions.invoke("sync-results", { body });
   if (error) throw error;
   if (data?.error) throw new Error(String(data.error));
+  if (data?.skipped) {
+    return {
+      skipped: true,
+      message: data?.message ? String(data.message) : "Event has not started yet.",
+      tournamentId,
+      lastSyncedAt: data?.lastSyncedAt ?? null,
+    };
+  }
 
   return {
     skipped: false,

@@ -45,12 +45,13 @@ Deno.serve(async (req) => {
       status: string;
       season_year: number;
       start_date: string | null;
+      lineup_lock_at: string | null;
     } | null = null;
 
     if (tournamentId) {
       const { data, error } = await admin
         .from("tournaments")
-        .select("id, name, dg_event_id, status, season_year, start_date")
+        .select("id, name, dg_event_id, status, season_year, start_date, lineup_lock_at")
         .eq("id", tournamentId)
         .maybeSingle();
       if (error) throw new Error(error.message);
@@ -58,7 +59,7 @@ Deno.serve(async (req) => {
     } else {
       const { data, error } = await admin
         .from("tournaments")
-        .select("id, name, dg_event_id, status, season_year, start_date")
+        .select("id, name, dg_event_id, status, season_year, start_date, lineup_lock_at")
         .in("status", ["open", "in_progress"])
         .order("start_date", { ascending: false })
         .limit(1)
@@ -100,12 +101,36 @@ Deno.serve(async (req) => {
       if (!isMember) throw new Error("League members only");
     }
 
+    // Block scoring until first tee / lineup lock — status may already be
+    // in_progress from Sync Odds (current_round) while draft is still open.
+    // Return 200 skipped (not 409) so ambient client refresh does not toast an error.
+    const lockMs = tournament.lineup_lock_at
+      ? new Date(tournament.lineup_lock_at).getTime()
+      : tournament.start_date
+        ? new Date(`${tournament.start_date}T00:00:00Z`).getTime()
+        : null;
+    if (tournament.status !== "completed" && lockMs != null && lockMs > Date.now()) {
+      return jsonResponse({
+        skipped: true,
+        message: `${tournament.name} has not started yet.`,
+        tournamentId: tournament.id,
+        lineup_lock_at: tournament.lineup_lock_at,
+        status: tournament.status,
+        resultsUpserted: 0,
+      });
+    }
+
     if (
       tournament.status === "open" &&
       tournament.start_date &&
       new Date(`${tournament.start_date}T00:00:00Z`).getTime() > Date.now()
     ) {
-      return jsonResponse({ error: `${tournament.name} has not started yet.` }, 409);
+      return jsonResponse({
+        skipped: true,
+        message: `${tournament.name} has not started yet.`,
+        tournamentId: tournament.id,
+        resultsUpserted: 0,
+      });
     }
 
     // No artificial member cooldown — DataGolf rate limits are fine if they occur.
