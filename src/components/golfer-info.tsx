@@ -83,13 +83,21 @@ export function GolferInfoButton({ golfer, className }: Props) {
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState<GolferInfoData>(golfer);
   const [maxHeightPx, setMaxHeightPx] = useState<number>(420);
+  const [alignOffset, setAlignOffset] = useState(0);
+  const [contentWidthPx, setContentWidthPx] = useState(22 * 16);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const SIDE_OFFSET = 6;
   const FOOTER_GAP = 16;
+  const EDGE_MARGIN = 16;
 
-  function measureAvailableBelow(): number {
+  function measureLayout() {
     const trigger = triggerRef.current;
-    if (!trigger) return 420;
+    if (!trigger) {
+      setMaxHeightPx(420);
+      setAlignOffset(0);
+      setContentWidthPx(Math.min(22 * 16, window.innerWidth - EDGE_MARGIN * 2));
+      return;
+    }
     const t = trigger.getBoundingClientRect();
     const footer =
       document.querySelector<HTMLElement>("[data-draft-footer]") ??
@@ -97,12 +105,25 @@ export function GolferInfoButton({ golfer, className }: Props) {
     const footerTop = footer?.getBoundingClientRect().top ?? window.innerHeight;
     // Content starts at trigger.bottom + SIDE_OFFSET; leave FOOTER_GAP above footer.
     const available = Math.floor(footerTop - t.bottom - SIDE_OFFSET - FOOTER_GAP);
-    return Math.max(160, Math.min(available, 28 * 16));
+    setMaxHeightPx(Math.max(160, Math.min(available, 28 * 16)));
+
+    // Keep a near-full-width panel inside the viewport: start-align to the
+    // trigger, then shift left with alignOffset if it would overflow right.
+    const width = Math.min(22 * 16, window.innerWidth - EDGE_MARGIN * 2);
+    let offset = 0;
+    if (t.left + width > window.innerWidth - EDGE_MARGIN) {
+      offset = window.innerWidth - EDGE_MARGIN - width - t.left;
+    }
+    if (t.left + offset < EDGE_MARGIN) {
+      offset = EDGE_MARGIN - t.left;
+    }
+    setContentWidthPx(width);
+    setAlignOffset(offset);
   }
 
   useEffect(() => {
     if (!open) return;
-    const update = () => setMaxHeightPx(measureAvailableBelow());
+    const update = () => measureLayout();
     update();
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
@@ -198,7 +219,7 @@ export function GolferInfoButton({ golfer, className }: Props) {
     <Popover
       open={open}
       onOpenChange={(next) => {
-        if (next) setMaxHeightPx(measureAvailableBelow());
+        if (next) measureLayout();
         setOpen(next);
       }}
     >
@@ -219,10 +240,11 @@ export function GolferInfoButton({ golfer, className }: Props) {
       <PopoverContent
         side="bottom"
         align="start"
+        alignOffset={alignOffset}
         avoidCollisions={false}
         sideOffset={SIDE_OFFSET}
-        style={{ maxHeight: maxHeightPx }}
-        className="z-[45] w-[min(22rem,calc(100vw-2rem))] space-y-3 overflow-y-auto p-4"
+        style={{ maxHeight: maxHeightPx, width: contentWidthPx }}
+        className="z-[45] w-auto max-w-[calc(100vw-2rem)] space-y-3 overflow-y-auto p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-3">
