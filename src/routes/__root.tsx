@@ -144,6 +144,8 @@ function RootComponent() {
       <Outlet />
       <Toaster
         richColors
+        closeButton
+        duration={2200}
         position="top-center"
         offset={{ top: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
         mobileOffset={{ top: "calc(env(safe-area-inset-top, 0px) + 12px)" }}

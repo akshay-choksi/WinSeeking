@@ -42,7 +42,7 @@ export function useLiveScoreRefresh(opts: UseLiveScoreRefreshOpts = {}) {
 
         if (result.skipped) {
           if (mode === "pull" || mode === "manual") {
-            toast.message(result.message ?? "Nothing to refresh");
+            toast.message(result.message ?? "Nothing to refresh", { duration: 1800 });
           }
           return result;
         }
@@ -53,23 +53,25 @@ export function useLiveScoreRefresh(opts: UseLiveScoreRefreshOpts = {}) {
         if (mode === "manual") {
           toast.success(result.cached ? "Scores are already current" : "Live scores refreshed", {
             description: result.message,
+            duration: 1800,
           });
         } else if (mode === "pull") {
           toast.success(result.cached ? "Scores are current" : "Scores updated", {
             description: result.message,
+            duration: 1800,
           });
         } else if (mode === "silent" && result.autoFinalized) {
-          toast.success("Event finalized", { description: result.message });
+          toast.success("Event finalized", { description: result.message, duration: 2200 });
         } else if (mode === "silent" && !result.cached && !signedInToastShown.current) {
           signedInToastShown.current = true;
-          toast.success("Scores updated");
+          toast.success("Scores updated", { duration: 1800 });
         }
 
         return result;
       } catch (err) {
         const description = err instanceof Error ? err.message : "Try again in a moment.";
         // Always surface failures — silent failures looked like "refresh doesn't work".
-        toast.error("Could not refresh scores", { description });
+        toast.error("Could not refresh scores", { description, duration: 2800 });
         return { skipped: true, message: description };
       } finally {
         inFlight.current = false;
