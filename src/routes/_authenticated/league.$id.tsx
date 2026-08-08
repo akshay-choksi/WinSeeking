@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trophy, ArrowLeft, Zap, Medal, Eye, Copy, X, LogIn } from "lucide-react";
+import { Trophy, ArrowLeft, Zap, Medal, Eye, Copy, X, LogIn, Flame } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
@@ -29,6 +29,7 @@ import { SurfacePanel } from "@/components/surface-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { StatCard } from "@/components/stat-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { GolferAvatar } from "@/components/golfer-avatar";
 
 export const Route = createFileRoute("/_authenticated/league/$id")({
   component: LeaguePage,
@@ -61,6 +62,31 @@ type SeasonStanding = {
   wins: number;
   top5s: number;
 };
+
+type TopScorer = {
+  golfer_id: string;
+  name: string;
+  pga_player_num: string | null;
+  fantasy_points: number;
+  position: number | null;
+  total_to_par: number | null;
+  status: string | null;
+  onYourLineup: boolean;
+  pickCount: number;
+  lineupCount: number;
+};
+
+function formatToPar(n: number | null): string {
+  if (n == null) return "—";
+  if (n === 0) return "E";
+  return n > 0 ? `+${n}` : String(n);
+}
+
+function formatPos(pos: number | null, status: string | null): string {
+  if (status && /cut|wd|dq/i.test(status)) return status.toUpperCase();
+  if (pos == null) return "—";
+  return `T${pos}`;
+}
 
 function PlayerLabel({
   name,
@@ -98,6 +124,7 @@ function LeaguePage() {
   const [selectedTournamentId, setSelectedTournamentId] = useState<string | null>(null);
   const [eventStandings, setEventStandings] = useState<EventStanding[]>([]);
   const [seasonStandings, setSeasonStandings] = useState<SeasonStanding[]>([]);
+  const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
   const [showDayLeaderBanner, setShowDayLeaderBanner] = useState(false);
   const seasonYear = useMemo(() => new Date().getFullYear(), []);
 
@@ -220,6 +247,64 @@ function LeaguePage() {
     );
   }
 
+  async function loadTopScorers(tournamentId: string) {
+    const { data: results } = await supabase
+      .from("player_results")
+      .select(
+        "golfer_id, fantasy_points, position, total_to_par, status, golfers(name, pga_player_num)",
+      )
+      .eq("tournament_id", tournamentId)
+      .order("fantasy_points", { ascending: false })
+      .limit(3);
+
+    if (!results?.length) {
+      setTopScorers([]);
+      return;
+    }
+
+    const { data: lineups } = await supabase
+      .from("lineups")
+      .select("id, user_id")
+      .eq("league_id", id)
+      .eq("tournament_id", tournamentId);
+    const lineupIds = (lineups ?? []).map((l) => l.id);
+    const yourLineupId = (lineups ?? []).find((l) => l.user_id === user?.id)?.id ?? null;
+
+    let pickCounts = new Map<string, number>();
+    let yourGolferIds = new Set<string>();
+    if (lineupIds.length) {
+      const { data: entries } = await supabase
+        .from("lineup_entries")
+        .select("lineup_id, golfer_id")
+        .in("lineup_id", lineupIds);
+      pickCounts = new Map();
+      for (const e of entries ?? []) {
+        pickCounts.set(e.golfer_id, (pickCounts.get(e.golfer_id) ?? 0) + 1);
+        if (yourLineupId && e.lineup_id === yourLineupId) {
+          yourGolferIds.add(e.golfer_id);
+        }
+      }
+    }
+
+    setTopScorers(
+      results.map((r) => {
+        const g = r.golfers as unknown as { name: string; pga_player_num: string | null } | null;
+        return {
+          golfer_id: r.golfer_id,
+          name: g?.name ?? "Golfer",
+          pga_player_num: g?.pga_player_num ?? null,
+          fantasy_points: Number(r.fantasy_points ?? 0),
+          position: r.position,
+          total_to_par: r.total_to_par,
+          status: r.status,
+          onYourLineup: yourGolferIds.has(r.golfer_id),
+          pickCount: pickCounts.get(r.golfer_id) ?? 0,
+          lineupCount: lineupIds.length,
+        };
+      }),
+    );
+  }
+
   useEffect(() => {
     loadLeague();
     loadTournaments();
@@ -228,22 +313,30 @@ function LeaguePage() {
   }, [id, user?.id]);
 
   useOnLiveScoresUpdated(() => {
-    if (selectedTournamentId) void loadEventStandings(selectedTournamentId);
+    if (selectedTournamentId) {
+      void loadEventStandings(selectedTournamentId);
+      void loadTopScorers(selectedTournamentId);
+    }
     void loadSeasonStandings();
   });
 
   useEffect(() => {
     if (!selectedTournamentId) {
       setEventStandings([]);
+      setTopScorers([]);
       return;
     }
     loadEventStandings(selectedTournamentId);
+    loadTopScorers(selectedTournamentId);
 
     let eventTimer: ReturnType<typeof setTimeout> | undefined;
     let seasonTimer: ReturnType<typeof setTimeout> | undefined;
     const scheduleEventLoad = () => {
       clearTimeout(eventTimer);
-      eventTimer = setTimeout(() => loadEventStandings(selectedTournamentId), 350);
+      eventTimer = setTimeout(() => {
+        void loadEventStandings(selectedTournamentId);
+        void loadTopScorers(selectedTournamentId);
+      }, 350);
     };
     const scheduleSeasonLoad = () => {
       clearTimeout(seasonTimer);
@@ -285,7 +378,7 @@ function LeaguePage() {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, selectedTournamentId]);
+  }, [id, selectedTournamentId, user?.id]);
 
   const selectedTournament = tournaments.find((t) => t.id === selectedTournamentId) ?? null;
   const rosterSize = league?.max_players ?? 6;
@@ -541,6 +634,57 @@ function LeaguePage() {
               </StatusBadge>
             )}
           </div>
+
+          {topScorers.length > 0 ? (
+            <SurfacePanel
+              icon={<Flame className="h-5 w-5" />}
+              title="Fantasy Points Leaders"
+              meta={
+                selectedTournament?.status === "in_progress" ? (
+                  <StatusBadge tone="live">Live</StatusBadge>
+                ) : selectedTournament?.status === "completed" ? (
+                  "Final"
+                ) : (
+                  "Field"
+                )
+              }
+            >
+              <div className="grid gap-0 sm:grid-cols-3 sm:divide-x">
+                {topScorers.map((g, i) => (
+                  <div
+                    key={g.golfer_id}
+                    className={`flex items-center gap-3 px-4 py-3 sm:px-5 ${
+                      i === 0 ? "bg-brand-muted/35 sm:rounded-none" : ""
+                    }`}
+                  >
+                    <div
+                      className={`grid h-7 w-7 shrink-0 place-items-center rounded-full font-mono text-xs font-bold ${
+                        i === 0
+                          ? "bg-primary/15 text-primary"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {i + 1}
+                    </div>
+                    <GolferAvatar name={g.name} pgaPlayerNum={g.pga_player_num} size="md" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium leading-tight">{g.name}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {formatPos(g.position, g.status)} · {formatToPar(g.total_to_par)}
+                        {g.onYourLineup ? " · Your pick" : ""}
+                        {!g.onYourLineup && g.lineupCount > 1 && g.pickCount > 0
+                          ? ` · ${g.pickCount}/${g.lineupCount} own`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right font-mono text-lg font-semibold tabular-nums text-success">
+                      {g.fantasy_points.toFixed(1)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SurfacePanel>
+          ) : null}
 
           <SurfacePanel
             icon={<Trophy className="h-5 w-5" />}
