@@ -156,7 +156,7 @@ function LineupViewerPage() {
   const locked = tournament ? isLineupLocked(tournament) : false;
   const { refresh: refreshScores, refreshing } = useLiveScoreRefresh({
     leagueId,
-    tournamentId: tournament?.id,
+    tournamentId: tournament?.id ?? tournamentQuery ?? null,
   });
 
   useOnLiveScoresUpdated((detail) => {
@@ -511,7 +511,7 @@ function LineupViewerPage() {
               <p className="mt-1 text-xs text-slate-400">{subtitle}</p>
             </div>
           </div>
-          {tournament?.status === "in_progress" ? (
+          {(tournament?.status === "in_progress" || tournament?.status === "completed") ? (
             <div className="text-right">
               <Button
                 type="button"
@@ -522,7 +522,11 @@ function LineupViewerPage() {
                 className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
               >
                 <RefreshCw className={refreshing ? "animate-spin" : ""} />
-                {refreshing ? "Refreshing…" : "Refresh live scores"}
+                {refreshing
+                  ? "Refreshing…"
+                  : tournament?.status === "completed"
+                    ? "Refresh scores"
+                    : "Refresh live scores"}
               </Button>
               <p className="mt-1.5 text-[11px] text-slate-400">
                 {lastSyncedAt

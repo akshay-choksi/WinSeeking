@@ -13,6 +13,7 @@ import {
   fetchEspnHoleStatsMap,
   lookupHoleStats,
   normalizePlayerName,
+  type DkHoleStats,
 } from "../_shared/espn.ts";
 import { detectEventFinal, finalizeTournament, mapScheduleStatus } from "../_shared/finalize.ts";
 
@@ -163,16 +164,39 @@ Deno.serve(async (req) => {
     }
 
     // In-play positions/scores from DataGolf; hole tallies from ESPN scorecards.
-    const [inPlayRaw, holeStatsMap] = await Promise.all([
-      dgFetch<unknown>("/preds/in-play", {
+    // Completed events: DataGolf in-play is the *current* tournament — only backfill
+    // hole tallies from ESPN's dated scoreboard onto existing player_results.
+    const holeStatsMap = await fetchEspnHoleStatsMap(tournament.name, {
+      startDate: tournament.start_date,
+    });
+
+    const isCompleted = tournament.status === "completed";
+    let inPlayRaw: unknown = null;
+    let players: InPlayPlayer[] = [];
+
+    if (!isCompleted) {
+      inPlayRaw = await dgFetch<unknown>("/preds/in-play", {
         tour: "pga",
         odds_format: "percent",
-      }),
-      fetchEspnHoleStatsMap(tournament.name),
-    ]);
+      });
+      players = extractInPlayPlayers(inPlayRaw);
+      const inPlayEventId = extractInPlayEventId(inPlayRaw);
+      if (
+        inPlayEventId &&
+        tournament.dg_event_id &&
+        String(inPlayEventId) !== String(tournament.dg_event_id)
+      ) {
+        // Live feed is a different event — fall back to hole-stats backfill only.
+        players = [];
+      }
+    }
 
-    const players = extractInPlayPlayers(inPlayRaw);
     if (players.length === 0) {
+      const patched = await backfillHoleStatsFromEspn({
+        admin,
+        tournamentId: tournament.id,
+        holeStatsMap,
+      });
       await admin
         .from("result_sync_state")
         .update({
@@ -181,10 +205,24 @@ Deno.serve(async (req) => {
           last_error: null,
         })
         .eq("tournament_id", tournament.id);
+
+      if (patched.updated === 0 && holeStatsMap.size === 0) {
+        return jsonResponse({
+          message: isCompleted
+            ? `No ESPN hole cards found for ${tournament.name}.`
+            : `No live in-play data for ${tournament.name}.`,
+          tournamentId: tournament.id,
+          resultsUpserted: 0,
+        });
+      }
+
       return jsonResponse({
-        message: `No live in-play data for ${tournament.name}.`,
+        message: `Updated hole stats for ${tournament.name}: ${patched.updated} players, ${patched.lineupsUpdated} lineups.`,
         tournamentId: tournament.id,
-        resultsUpserted: 0,
+        resultsUpserted: patched.updated,
+        lineupsUpdated: patched.lineupsUpdated,
+        cached: false,
+        lastSyncedAt: new Date().toISOString(),
       });
     }
 
@@ -493,6 +531,144 @@ function extractInPlayPlayers(raw: unknown): InPlayPlayer[] {
     }
   }
   return [];
+}
+
+function extractInPlayEventId(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  for (const key of ["event_id", "dg_event_id", "eventId", "tournament_id"]) {
+    if (obj[key] != null && String(obj[key]).trim()) return String(obj[key]);
+  }
+  for (const nestKey of ["info", "event", "meta", "tournament"]) {
+    const nest = obj[nestKey];
+    if (nest && typeof nest === "object") {
+      const n = nest as Record<string, unknown>;
+      for (const key of ["event_id", "dg_event_id", "eventId", "id"]) {
+        if (n[key] != null && String(n[key]).trim()) return String(n[key]);
+      }
+    }
+  }
+  return null;
+}
+
+type AdminClient = ReturnType<typeof adminClient>;
+
+/** Patch hole tallies + fantasy points on existing results using ESPN scorecards. */
+async function backfillHoleStatsFromEspn(opts: {
+  admin: AdminClient;
+  tournamentId: string;
+  holeStatsMap: Map<string, DkHoleStats>;
+}): Promise<{ updated: number; lineupsUpdated: number }> {
+  const { admin, tournamentId, holeStatsMap } = opts;
+  if (holeStatsMap.size === 0) return { updated: 0, lineupsUpdated: 0 };
+
+  const { data: existing, error } = await admin
+    .from("player_results")
+    .select(
+      "golfer_id, position, made_cut, total_to_par, status, rounds, golfers(name)",
+    )
+    .eq("tournament_id", tournamentId);
+  if (error) throw new Error(error.message);
+  if (!existing?.length) return { updated: 0, lineupsUpdated: 0 };
+
+  const rows: {
+    tournament_id: string;
+    golfer_id: string;
+    position: number | null;
+    made_cut: boolean;
+    total_to_par: number | null;
+    birdies: number;
+    eagles: number;
+    pars: number;
+    bogeys: number;
+    double_bogeys: number;
+    double_eagles: number;
+    bonus_points: number;
+    rounds: unknown;
+    fantasy_points: number;
+    status: string | null;
+  }[] = [];
+
+  for (const row of existing) {
+    const g = row.golfers as unknown as { name?: string } | null;
+    const name = String(g?.name ?? "");
+    const key = normalizePlayerName(name);
+    if (!key || !holeStatsMap.has(key)) continue;
+    const holes = holeStatsMap.get(key)!;
+
+    const pos = row.position as number | null;
+    const missedCut =
+      !row.made_cut ||
+      String(row.status ?? "").toUpperCase().includes("CUT") ||
+      String(row.status ?? "").toUpperCase() === "WD" ||
+      String(row.status ?? "").toUpperCase() === "DQ";
+
+    const pts = computeFantasyPoints({
+      position: missedCut ? null : pos,
+      doubleEagles: holes.doubleEagles,
+      eagles: holes.eagles,
+      birdies: holes.birdies,
+      pars: holes.pars,
+      bogeys: holes.bogeys,
+      doubleBogeys: holes.doubleBogeys,
+      bonusPoints: holes.bonusPoints,
+    });
+
+    rows.push({
+      tournament_id: tournamentId,
+      golfer_id: row.golfer_id,
+      position: pos,
+      made_cut: Boolean(row.made_cut),
+      total_to_par: row.total_to_par as number | null,
+      birdies: holes.birdies,
+      eagles: holes.eagles,
+      pars: holes.pars,
+      bogeys: holes.bogeys,
+      double_bogeys: holes.doubleBogeys,
+      double_eagles: holes.doubleEagles,
+      bonus_points: holes.bonusPoints,
+      rounds: row.rounds,
+      fantasy_points: pts,
+      status: (row.status as string | null) ?? null,
+    });
+  }
+
+  if (rows.length === 0) return { updated: 0, lineupsUpdated: 0 };
+
+  const { error: upsertError } = await admin.from("player_results").upsert(rows, {
+    onConflict: "tournament_id,golfer_id",
+  });
+  if (upsertError) throw new Error(upsertError.message);
+
+  const ptsByGolfer = new Map(rows.map((r) => [r.golfer_id, r.fantasy_points]));
+  const { data: lineups, error: lineupsError } = await admin
+    .from("lineups")
+    .select("id")
+    .eq("tournament_id", tournamentId);
+  if (lineupsError) throw new Error(lineupsError.message);
+
+  const lineupIds = (lineups ?? []).map((l) => l.id);
+  let lineupsUpdated = 0;
+  if (lineupIds.length > 0) {
+    const { data: entries, error: entriesError } = await admin
+      .from("lineup_entries")
+      .select("lineup_id, golfer_id")
+      .in("lineup_id", lineupIds);
+    if (entriesError) throw new Error(entriesError.message);
+
+    const totals = new Map<string, number>(lineupIds.map((id) => [id, 0]));
+    for (const e of entries ?? []) {
+      totals.set(e.lineup_id, (totals.get(e.lineup_id) ?? 0) + (ptsByGolfer.get(e.golfer_id) ?? 0));
+    }
+    await Promise.all(
+      [...totals.entries()].map(([id, total]) =>
+        admin.from("lineups").update({ total_points: total }).eq("id", id),
+      ),
+    );
+    lineupsUpdated = lineupIds.length;
+  }
+
+  return { updated: rows.length, lineupsUpdated };
 }
 
 function hasRoundScore(raw: unknown): boolean {

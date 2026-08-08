@@ -231,33 +231,51 @@ function pickEvent(events: EspnEvent[], tournamentName: string): EspnEvent | nul
   return best;
 }
 
-async function fetchEspnScoreboard(): Promise<EspnScoreboard | null> {
-  try {
-    const res = await fetch(
-      "https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard",
-      { headers: { "User-Agent": ESPN_UA } },
-    );
-    if (!res.ok) return null;
-    return (await res.json()) as EspnScoreboard;
-  } catch {
-    return null;
+async function fetchEspnScoreboard(dates?: string | null): Promise<EspnScoreboard | null> {
+  // Prefer site.web.api — site.api.espn.com often returns 403.
+  // `dates=YYYYMMDD` loads that week's scoreboard (needed for completed events).
+  const dateQs =
+    dates && /^\d{4}-\d{2}-\d{2}/.test(dates)
+      ? `?dates=${dates.slice(0, 10).replace(/-/g, "")}`
+      : dates && /^\d{8}$/.test(dates)
+        ? `?dates=${dates}`
+        : "";
+  const urls = [
+    `https://site.web.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard${dateQs}`,
+    `https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard${dateQs}`,
+  ];
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { headers: { "User-Agent": ESPN_UA } });
+      if (!res.ok) continue;
+      return (await res.json()) as EspnScoreboard;
+    } catch {
+      // try next
+    }
   }
+  return null;
 }
 
 /**
  * Fetch ESPN PGA scoreboard and build name → DK hole stats for the matching event.
- * Best-effort: returns empty map on network/parse failure.
+ * Pass startDate (YYYY-MM-DD) so completed tournaments still resolve hole cards.
  */
 export async function fetchEspnHoleStatsMap(
   tournamentName: string,
+  opts?: { startDate?: string | null },
 ): Promise<Map<string, DkHoleStats>> {
   const map = new Map<string, DkHoleStats>();
-  const data = await fetchEspnScoreboard();
+  const data = await fetchEspnScoreboard(opts?.startDate ?? null);
   if (!data) return map;
   const event = pickEvent(data.events ?? [], tournamentName);
+  if (!event) return map;
+  // Require a real name match for dated boards that may include multiple events.
+  if (eventMatchScore(event, tournamentName) <= 0 && (data.events?.length ?? 0) > 1) {
+    return map;
+  }
   const competitors = event?.competitions?.[0]?.competitors ?? [];
   for (const comp of competitors) {
-    const display = comp.athlete?.displayName;
+    const display = comp.athlete?.displayName ?? comp.athlete?.fullName;
     if (!display) continue;
     const key = normalizePlayerName(display);
     if (!key) continue;

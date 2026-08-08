@@ -1,4 +1,4 @@
-import { ClientOnly, createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { ClientOnly, createFileRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { RouteShell } from "@/components/route-shell";
 import { AppHeader } from "@/components/app-header";
@@ -22,8 +22,30 @@ export const Route = createFileRoute("/_authenticated")({
   ),
 });
 
+function tournamentIdFromSearch(search: unknown): string | null {
+  if (search && typeof search === "object" && "tournament" in search) {
+    const t = (search as { tournament?: unknown }).tournament;
+    return typeof t === "string" && t ? t : null;
+  }
+  if (typeof search === "string") {
+    try {
+      return new URLSearchParams(search.startsWith("?") ? search : `?${search}`).get(
+        "tournament",
+      );
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 function AuthedLayout() {
-  const { refreshing, refresh } = useLiveScoreRefresh({ onSignIn: true });
+  const search = useRouterState({ select: (s) => s.location.search });
+  const tournamentId = tournamentIdFromSearch(search);
+  const { refreshing, refresh } = useLiveScoreRefresh({
+    onSignIn: true,
+    tournamentId,
+  });
 
   return (
     <div className="min-h-dvh bg-background">
