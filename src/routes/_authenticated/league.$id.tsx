@@ -12,8 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trophy, ArrowLeft, Zap, Medal, Eye, Copy, X } from "lucide-react";
+import { Trophy, ArrowLeft, Zap, Medal, Eye, Copy, X, LogIn } from "lucide-react";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card } from "@/components/ui/card";
 import {
   isLineupLocked,
   pickActiveTournament,
@@ -91,6 +93,7 @@ function LeaguePage() {
   const { id } = useParams({ from: "/_authenticated/league/$id" });
   const { user } = useAuth();
   const [league, setLeague] = useState<LeagueRow | null>(null);
+  const [leagueStatus, setLeagueStatus] = useState<"loading" | "ready" | "unavailable">("loading");
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState<string | null>(null);
   const [eventStandings, setEventStandings] = useState<EventStanding[]>([]);
@@ -99,12 +102,21 @@ function LeaguePage() {
   const seasonYear = useMemo(() => new Date().getFullYear(), []);
 
   async function loadLeague() {
-    const { data } = await supabase
+    setLeagueStatus("loading");
+    const { data, error } = await supabase
       .from("leagues")
       .select("id, name, invite_code, salary_cap, max_players")
       .eq("id", id)
       .maybeSingle();
+    if (error) {
+      toast.error("Could not load league", { description: error.message });
+      setLeague(null);
+      setLeagueStatus("unavailable");
+      return;
+    }
     setLeague(data);
+    // RLS returns null for non-members — show an explicit join path instead of a blank page.
+    setLeagueStatus(data ? "ready" : "unavailable");
   }
 
   async function loadTournaments() {
@@ -213,7 +225,7 @@ function LeaguePage() {
     loadTournaments();
     loadSeasonStandings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, user?.id]);
 
   useOnLiveScoresUpdated(() => {
     if (selectedTournamentId) void loadEventStandings(selectedTournamentId);
@@ -356,6 +368,36 @@ function LeaguePage() {
       >
         <ArrowLeft className="h-4 w-4" /> All leagues
       </Link>
+
+      {leagueStatus === "loading" && !league ? (
+        <Card className="gap-0 p-6 shadow-sm">
+          <Skeleton className="h-7 w-48" />
+          <Skeleton className="mt-3 h-4 w-64" />
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        </Card>
+      ) : null}
+
+      {leagueStatus === "unavailable" && !league ? (
+        <Card className="gap-0 border-dashed p-10 text-center shadow-sm">
+          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-brand-muted text-primary">
+            <Trophy className="h-7 w-7" />
+          </div>
+          <h2 className="text-lg font-semibold">League not available</h2>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+            You&apos;re signed in, but this league isn&apos;t on your account. Rejoin with the invite
+            code from the home page.
+          </p>
+          <Button className="mt-6" asChild>
+            <Link to="/">
+              <LogIn className="mr-2 h-4 w-4" /> Back to leagues
+            </Link>
+          </Button>
+        </Card>
+      ) : null}
 
       {league && (
         <>
