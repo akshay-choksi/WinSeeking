@@ -8,6 +8,87 @@ export const SCORING = {
   doubleBogeyOrWorse: -1,
 } as const;
 
+/** DK Classic streak / achievement bonus point values. */
+export const BONUS_SCORING = {
+  birdieStreak: 3,
+  bogeyFreeRound: 3,
+  holeInOne: 5,
+  allFourUnder70: 5,
+} as const;
+
+/** Component counts that make up player_results.bonus_points. */
+export type BonusBreakdown = {
+  birdieStreaks: number;
+  bogeyFreeRounds: number;
+  holeInOnes: number;
+  allFourUnder70: boolean;
+};
+
+export type BonusBreakdownLine = {
+  label: string;
+  count: number;
+  pts: number;
+};
+
+/** Normalize JSON from player_results.bonus_breakdown. */
+export function parseBonusBreakdown(raw: unknown): BonusBreakdown | null {
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  // Default `{}` before the first post-migration sync — treat as missing.
+  if (
+    !("birdieStreaks" in o) &&
+    !("bogeyFreeRounds" in o) &&
+    !("holeInOnes" in o) &&
+    !("allFourUnder70" in o)
+  ) {
+    return null;
+  }
+  return {
+    birdieStreaks: Math.max(0, Math.trunc(Number(o.birdieStreaks) || 0)),
+    bogeyFreeRounds: Math.max(0, Math.trunc(Number(o.bogeyFreeRounds) || 0)),
+    holeInOnes: Math.max(0, Math.trunc(Number(o.holeInOnes) || 0)),
+    allFourUnder70: Boolean(o.allFourUnder70),
+  };
+}
+
+/** Non-zero bonus lines for tooltips (e.g. "Birdie streak ×2 · +6"). */
+export function bonusBreakdownLines(b: BonusBreakdown | null | undefined): BonusBreakdownLine[] {
+  if (!b) return [];
+  const lines: BonusBreakdownLine[] = [];
+  if (b.birdieStreaks > 0) {
+    lines.push({
+      label: b.birdieStreaks === 1 ? "Birdie streak" : `Birdie streak ×${b.birdieStreaks}`,
+      count: b.birdieStreaks,
+      pts: b.birdieStreaks * BONUS_SCORING.birdieStreak,
+    });
+  }
+  if (b.bogeyFreeRounds > 0) {
+    lines.push({
+      label:
+        b.bogeyFreeRounds === 1
+          ? "Bogey-free round"
+          : `Bogey-free round ×${b.bogeyFreeRounds}`,
+      count: b.bogeyFreeRounds,
+      pts: b.bogeyFreeRounds * BONUS_SCORING.bogeyFreeRound,
+    });
+  }
+  if (b.holeInOnes > 0) {
+    lines.push({
+      label: b.holeInOnes === 1 ? "Hole-in-one" : `Hole-in-one ×${b.holeInOnes}`,
+      count: b.holeInOnes,
+      pts: b.holeInOnes * BONUS_SCORING.holeInOne,
+    });
+  }
+  if (b.allFourUnder70) {
+    lines.push({
+      label: "All 4 rounds under 70",
+      count: 1,
+      pts: BONUS_SCORING.allFourUnder70,
+    });
+  }
+  return lines;
+}
+
 /** Live place points from current leaderboard position (DK Classic). */
 export function finishPoints(position: number | null, _madeCut?: boolean): number {
   if (position == null || position < 1) return 0;

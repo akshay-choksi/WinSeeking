@@ -374,6 +374,7 @@ export type Database = {
         Row: {
           birdies: number
           bogeys: number
+          bonus_breakdown: Json
           bonus_points: number
           created_at: string
           double_bogeys: number
@@ -393,6 +394,7 @@ export type Database = {
         Insert: {
           birdies?: number
           bogeys?: number
+          bonus_breakdown?: Json
           bonus_points?: number
           created_at?: string
           double_bogeys?: number
@@ -412,6 +414,7 @@ export type Database = {
         Update: {
           birdies?: number
           bogeys?: number
+          bonus_breakdown?: Json
           bonus_points?: number
           created_at?: string
           double_bogeys?: number

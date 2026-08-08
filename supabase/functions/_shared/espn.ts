@@ -38,6 +38,14 @@ type EspnScoreboard = {
   events?: EspnEvent[];
 };
 
+/** DK Classic bonus components (streak / bogey-free / HIO / all-4-under-70). */
+export type DkBonusBreakdown = {
+  birdieStreaks: number;
+  bogeyFreeRounds: number;
+  holeInOnes: number;
+  allFourUnder70: boolean;
+};
+
 /** Per-player hole tallies + DK bonus points derived from ESPN scorecards. */
 export type DkHoleStats = {
   doubleEagles: number;
@@ -48,6 +56,14 @@ export type DkHoleStats = {
   doubleBogeys: number;
   /** Streak / bogey-free / HIO / all-4-under-70 bonus points. */
   bonusPoints: number;
+  bonusBreakdown: DkBonusBreakdown;
+};
+
+const EMPTY_BONUS: DkBonusBreakdown = {
+  birdieStreaks: 0,
+  bogeyFreeRounds: 0,
+  holeInOnes: 0,
+  allFourUnder70: false,
 };
 
 const EMPTY_STATS: DkHoleStats = {
@@ -58,6 +74,7 @@ const EMPTY_STATS: DkHoleStats = {
   bogeys: 0,
   doubleBogeys: 0,
   bonusPoints: 0,
+  bonusBreakdown: EMPTY_BONUS,
 };
 
 export type EspnAthleteRef = {
@@ -181,11 +198,18 @@ function statsFromCompetitor(comp: EspnCompetitor): DkHoleStats {
     completedRoundStrokes.length >= 4 &&
     completedRoundStrokes.slice(0, 4).every((s) => s < 70);
 
+  const bonusBreakdown: DkBonusBreakdown = {
+    birdieStreaks: birdieStreakBonuses,
+    bogeyFreeRounds,
+    holeInOnes,
+    allFourUnder70,
+  };
+
   const bonusPoints =
-    birdieStreakBonuses * 3 +
-    bogeyFreeRounds * 3 +
-    holeInOnes * 5 +
-    (allFourUnder70 ? 5 : 0);
+    bonusBreakdown.birdieStreaks * 3 +
+    bonusBreakdown.bogeyFreeRounds * 3 +
+    bonusBreakdown.holeInOnes * 5 +
+    (bonusBreakdown.allFourUnder70 ? 5 : 0);
 
   return {
     doubleEagles,
@@ -195,6 +219,7 @@ function statsFromCompetitor(comp: EspnCompetitor): DkHoleStats {
     bogeys,
     doubleBogeys,
     bonusPoints,
+    bonusBreakdown,
   };
 }
 

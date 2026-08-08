@@ -326,6 +326,7 @@ Deno.serve(async (req) => {
       double_bogeys: number;
       double_eagles: number;
       bonus_points: number;
+      bonus_breakdown: DkHoleStats["bonusBreakdown"];
       rounds: unknown;
       fantasy_points: number;
       status: string | null;
@@ -386,6 +387,7 @@ Deno.serve(async (req) => {
         double_bogeys: holes.doubleBogeys,
         double_eagles: holes.doubleEagles,
         bonus_points: holes.bonusPoints,
+        bonus_breakdown: holes.bonusBreakdown,
         rounds,
         fantasy_points: pts,
         status: missedCut ? posText || statusRaw || "CUT" : statusRaw || null,
@@ -584,6 +586,7 @@ async function backfillHoleStatsFromEspn(opts: {
     double_bogeys: number;
     double_eagles: number;
     bonus_points: number;
+    bonus_breakdown: DkHoleStats["bonusBreakdown"];
     rounds: unknown;
     fantasy_points: number;
     status: string | null;
@@ -627,6 +630,7 @@ async function backfillHoleStatsFromEspn(opts: {
       double_bogeys: holes.doubleBogeys,
       double_eagles: holes.doubleEagles,
       bonus_points: holes.bonusPoints,
+      bonus_breakdown: holes.bonusBreakdown,
       rounds: row.rounds,
       fantasy_points: pts,
       status: (row.status as string | null) ?? null,

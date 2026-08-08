@@ -4,15 +4,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useLiveScoreRefresh, useOnLiveScoresUpdated } from "@/hooks/use-live-score-refresh";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ArrowLeft, Lock, RefreshCw } from "lucide-react";
 import { GolferAvatar } from "@/components/golfer-avatar";
 import { GolferInfoButton } from "@/components/golfer-info";
+import { StatusBadge } from "@/components/status-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
+  bonusBreakdownLines,
   breakdownFantasyPoints,
   formatAmericanOdds,
   isLineupLocked,
+  parseBonusBreakdown,
   pickActiveTournament,
+  type BonusBreakdown,
   type Tournament,
 } from "@/lib/scoring";
 import { initialsFromName } from "@/lib/profile";
@@ -64,7 +69,22 @@ type GolferRow = {
   double_bogeys: number;
   double_eagles: number;
   bonus_points: number;
+  bonus_breakdown: BonusBreakdown | null;
+  pickCount: number;
+  lineupCount: number;
 };
+
+function OwnershipBadge({ pickCount, lineupCount }: { pickCount: number; lineupCount: number }) {
+  if (lineupCount < 2 || pickCount < 1) return null;
+  const fraction = `${pickCount}/${lineupCount}`;
+  if (pickCount === 1) {
+    return <StatusBadge tone="open">Unique · {fraction}</StatusBadge>;
+  }
+  if (pickCount === lineupCount) {
+    return <StatusBadge tone="muted">Everyone · {fraction}</StatusBadge>;
+  }
+  return <StatusBadge tone="muted">{fraction}</StatusBadge>;
+}
 
 function formatToPar(n: number | null): string {
   if (n == null) return "—";
@@ -130,6 +150,63 @@ function StatPts({ count, pts }: { count?: number; pts: number }) {
         {formatPts(pts)}
       </span>
     </span>
+  );
+}
+
+function BonusBreakdownBody({
+  pts,
+  breakdown,
+}: {
+  pts: number;
+  breakdown: BonusBreakdown | null;
+}) {
+  const lines = bonusBreakdownLines(breakdown);
+  if (lines.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {pts > 0
+          ? "Bonus details will appear after the next score refresh."
+          : "No streak or achievement bonuses yet."}
+      </p>
+    );
+  }
+  return (
+    <ul className="space-y-1.5">
+      {lines.map((line) => (
+        <li key={line.label} className="flex items-center justify-between gap-4 text-xs">
+          <span className="text-slate-700">{line.label}</span>
+          <span className="font-mono font-medium text-emerald-700">{formatPts(line.pts)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function BonusPts({ pts, breakdown }: { pts: number; breakdown: BonusBreakdown | null }) {
+  const lines = bonusBreakdownLines(breakdown);
+  const interactive = pts > 0 || lines.length > 0;
+  if (!interactive) return <StatPts pts={pts} />;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex rounded-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Bonus points breakdown"
+        >
+          <span className="underline decoration-dotted decoration-emerald-600/50 underline-offset-2">
+            <StatPts pts={pts} />
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-56 p-3">
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+          Bonus breakdown
+        </div>
+        <BonusBreakdownBody pts={pts} breakdown={breakdown} />
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -270,8 +347,9 @@ function LineupViewerPage() {
       .eq("lineup_id", lineup.id);
 
     const golferIds = (entries ?? []).map((e) => e.golfer_id);
+    const lockedNow = isLineupLocked(active);
 
-    const [{ data: prices }, { data: results }] = await Promise.all([
+    const [{ data: prices }, { data: results }, ownership] = await Promise.all([
       golferIds.length
         ? supabase
             .from("player_prices")
@@ -294,7 +372,7 @@ function LineupViewerPage() {
         ? supabase
             .from("player_results")
             .select(
-              "golfer_id, position, total_to_par, fantasy_points, made_cut, status, birdies, eagles, pars, bogeys, double_bogeys, double_eagles, bonus_points",
+              "golfer_id, position, total_to_par, fantasy_points, made_cut, status, birdies, eagles, pars, bogeys, double_bogeys, double_eagles, bonus_points, bonus_breakdown",
             )
             .eq("tournament_id", active.id)
             .in("golfer_id", golferIds)
@@ -313,13 +391,37 @@ function LineupViewerPage() {
               double_bogeys: number;
               double_eagles: number;
               bonus_points: number;
+              bonus_breakdown: unknown;
             }[],
           }),
+      lockedNow
+        ? (async () => {
+            const { data: leagueLineups } = await supabase
+              .from("lineups")
+              .select("id")
+              .eq("league_id", leagueId)
+              .eq("tournament_id", active.id);
+            const lineupIds = (leagueLineups ?? []).map((l) => l.id);
+            if (lineupIds.length === 0) {
+              return { lineupCount: 0, pickCounts: new Map<string, number>() };
+            }
+            const { data: leagueEntries } = await supabase
+              .from("lineup_entries")
+              .select("golfer_id")
+              .in("lineup_id", lineupIds);
+            const pickCounts = new Map<string, number>();
+            for (const entry of leagueEntries ?? []) {
+              pickCounts.set(entry.golfer_id, (pickCounts.get(entry.golfer_id) ?? 0) + 1);
+            }
+            return { lineupCount: lineupIds.length, pickCounts };
+          })()
+        : Promise.resolve({ lineupCount: 0, pickCounts: new Map<string, number>() }),
     ]);
     if (gen !== loadGenRef.current) return;
 
     const priceById = new Map((prices ?? []).map((p) => [p.golfer_id, p]));
     const resultById = new Map((results ?? []).map((r) => [r.golfer_id, r]));
+    const { lineupCount, pickCounts } = ownership;
 
     const next: GolferRow[] = (entries ?? []).map((e) => {
       const g = e.golfers as unknown as {
@@ -388,6 +490,9 @@ function LineupViewerPage() {
         double_bogeys: Number(res?.double_bogeys ?? 0),
         double_eagles: Number(res?.double_eagles ?? 0),
         bonus_points: Number(res?.bonus_points ?? 0),
+        bonus_breakdown: parseBonusBreakdown(res?.bonus_breakdown),
+        pickCount: pickCounts.get(e.golfer_id) ?? 0,
+        lineupCount,
       };
     });
 
@@ -582,8 +687,11 @@ function LineupViewerPage() {
                           <div className="font-medium text-slate-900">{r.name}</div>
                           <GolferInfoButton golfer={toGolferInfo(r)} />
                         </div>
-                        <div className="text-xs text-slate-500">
-                          {formatAmericanOdds(r.decimal_odds)} · {formatOwgr(r.owgr_rank)}
+                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                          <span className="text-xs text-slate-500">
+                            {formatAmericanOdds(r.decimal_odds)} · {formatOwgr(r.owgr_rank)}
+                          </span>
+                          <OwnershipBadge pickCount={r.pickCount} lineupCount={r.lineupCount} />
                         </div>
                       </div>
                       <div className="text-right">
@@ -621,7 +729,7 @@ function LineupViewerPage() {
                       <MobileStat label="Pars" count={bd.parCount} pts={bd.parPts} />
                       <MobileStat label="Bogeys" count={bd.bogeyCount} pts={bd.bogeyPts} />
                       <MobileStat label="Dbl+" count={bd.doubleBogeyCount} pts={bd.doubleBogeyPts} />
-                      <MobileStat label="Bonus" pts={bd.bonusPoints} />
+                      <MobileBonusStat pts={bd.bonusPoints} breakdown={r.bonus_breakdown} />
                     </div>
                   </div>
                 );
@@ -677,8 +785,11 @@ function LineupViewerPage() {
                                 <div className="font-medium text-slate-900">{r.name}</div>
                                 <GolferInfoButton golfer={toGolferInfo(r)} />
                               </div>
-                              <div className="text-xs text-slate-500">
-                                {formatAmericanOdds(r.decimal_odds)} · {formatOwgr(r.owgr_rank)}
+                              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                <span className="text-xs text-slate-500">
+                                  {formatAmericanOdds(r.decimal_odds)} · {formatOwgr(r.owgr_rank)}
+                                </span>
+                                <OwnershipBadge pickCount={r.pickCount} lineupCount={r.lineupCount} />
                               </div>
                             </div>
                           </div>
@@ -708,7 +819,7 @@ function LineupViewerPage() {
                           <StatPts count={bd.doubleBogeyCount} pts={bd.doubleBogeyPts} />
                         </td>
                         <td className="px-3 py-3 text-right">
-                          <StatPts pts={bd.bonusPoints} />
+                          <BonusPts pts={bd.bonusPoints} breakdown={r.bonus_breakdown} />
                         </td>
                         <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-700">
                           {pts.toFixed(1)}
@@ -734,7 +845,8 @@ function LineupViewerPage() {
             </div>
             <p className="border-t px-4 py-3 text-xs text-slate-500">
               Each column shows count (when applicable) and points earned. DK Classic: Eagle +8 ·
-              Birdie +3 · Par +0.5 · Bogey −0.5 · Double+ −1 · Place live (1st +30 … 50th +1).
+              Birdie +3 · Par +0.5 · Bogey −0.5 · Double+ −1 · Place live (1st +30 … 50th +1). Tap
+              Bonus for streak / bogey-free / HIO breakdown.
             </p>
           </>
         )}
@@ -760,5 +872,44 @@ function MobileStat({
         {formatPts(pts)}
       </div>
     </div>
+  );
+}
+
+function MobileBonusStat({
+  pts,
+  breakdown,
+}: {
+  pts: number;
+  breakdown: BonusBreakdown | null;
+}) {
+  const lines = bonusBreakdownLines(breakdown);
+  const interactive = pts > 0 || lines.length > 0;
+  if (!interactive) {
+    return <MobileStat label="Bonus" pts={pts} />;
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="w-full rounded-md border border-slate-100 px-2 py-1.5 text-center outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Bonus points breakdown"
+        >
+          <div className="text-[10px] uppercase tracking-wide text-slate-400 underline decoration-dotted underline-offset-2">
+            Bonus
+          </div>
+          <div className={`font-mono text-[11px] ${pts < 0 ? "text-red-600" : "text-emerald-700"}`}>
+            {formatPts(pts)}
+          </div>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="center" className="w-56 p-3">
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+          Bonus breakdown
+        </div>
+        <BonusBreakdownBody pts={pts} breakdown={breakdown} />
+      </PopoverContent>
+    </Popover>
   );
 }
