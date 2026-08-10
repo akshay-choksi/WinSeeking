@@ -13,14 +13,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   bonusBreakdownLines,
   breakdownFantasyPoints,
+  currentMoneyHoleRound,
   formatAmericanOdds,
   isLineupLocked,
+  MONEY_HOLE_MULTIPLIER,
   parseBonusBreakdown,
   pickActiveTournament,
   type BonusBreakdown,
   type Tournament,
 } from "@/lib/scoring";
 import { initialsFromName } from "@/lib/profile";
+import { HarrysBigHole } from "@/components/harrys-big-hole";
 
 export const Route = createFileRoute("/_authenticated/league/$id_/lineup/$userId")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -70,6 +73,7 @@ type GolferRow = {
   double_eagles: number;
   bonus_points: number;
   bonus_breakdown: BonusBreakdown | null;
+  money_hole_points: number;
   pickCount: number;
   lineupCount: number;
 };
@@ -222,6 +226,7 @@ function LineupViewerPage() {
   const [ownerName, setOwnerName] = useState("Player");
   const [ownerAvatarUrl, setOwnerAvatarUrl] = useState<string | null>(null);
   const [tournament, setTournament] = useState<Tournament | null>(null);
+  const [moneyHole, setMoneyHole] = useState<{ round: number; hole: number } | null>(null);
   const [rows, setRows] = useState<GolferRow[]>([]);
   const [totalSpent, setTotalSpent] = useState(0);
   const [lineupTotal, setLineupTotal] = useState(0);
@@ -268,7 +273,7 @@ function LineupViewerPage() {
       const { data } = await supabase
         .from("tournaments")
         .select(
-          "id, dg_event_id, name, start_date, end_date, season_year, event_type, fedex_multiplier, status, lineup_lock_at",
+          "id, dg_event_id, name, start_date, end_date, season_year, event_type, fedex_multiplier, status, lineup_lock_at, last_completed_round",
         )
         .eq("id", tournamentQuery)
         .maybeSingle();
@@ -277,7 +282,7 @@ function LineupViewerPage() {
       const { data: tournaments } = await supabase
         .from("tournaments")
         .select(
-          "id, dg_event_id, name, start_date, end_date, season_year, event_type, fedex_multiplier, status, lineup_lock_at",
+          "id, dg_event_id, name, start_date, end_date, season_year, event_type, fedex_multiplier, status, lineup_lock_at, last_completed_round",
         )
         .in("status", ["open", "in_progress", "completed", "scheduled"])
         .order("start_date", { ascending: false })
@@ -292,8 +297,25 @@ function LineupViewerPage() {
 
     if (!active) {
       setRows([]);
+      setMoneyHole(null);
       setLoading(false);
       return;
+    }
+
+    {
+      const round = currentMoneyHoleRound(active);
+      const { data: mh } = await supabase
+        .from("tournament_money_holes")
+        .select("hole_number")
+        .eq("tournament_id", active.id)
+        .eq("round_number", round)
+        .maybeSingle();
+      if (gen !== loadGenRef.current) return;
+      setMoneyHole(
+        mh?.hole_number != null
+          ? { round, hole: Number(mh.hole_number) }
+          : null,
+      );
     }
 
     const { data: syncState } = await supabase
@@ -372,7 +394,7 @@ function LineupViewerPage() {
         ? supabase
             .from("player_results")
             .select(
-              "golfer_id, position, total_to_par, fantasy_points, made_cut, status, birdies, eagles, pars, bogeys, double_bogeys, double_eagles, bonus_points, bonus_breakdown",
+              "golfer_id, position, total_to_par, fantasy_points, made_cut, status, birdies, eagles, pars, bogeys, double_bogeys, double_eagles, bonus_points, bonus_breakdown, money_hole_points",
             )
             .eq("tournament_id", active.id)
             .in("golfer_id", golferIds)
@@ -392,6 +414,7 @@ function LineupViewerPage() {
               double_eagles: number;
               bonus_points: number;
               bonus_breakdown: unknown;
+              money_hole_points: number;
             }[],
           }),
       lockedNow
@@ -491,6 +514,7 @@ function LineupViewerPage() {
         double_eagles: Number(res?.double_eagles ?? 0),
         bonus_points: Number(res?.bonus_points ?? 0),
         bonus_breakdown: parseBonusBreakdown(res?.bonus_breakdown),
+        money_hole_points: Number(res?.money_hole_points ?? 0),
         pickCount: pickCounts.get(e.golfer_id) ?? 0,
         lineupCount,
       };
@@ -614,6 +638,15 @@ function LineupViewerPage() {
               <h1 className="mt-1 text-2xl font-bold tracking-tight">{ownerName}</h1>
               <p className="mt-1 text-sm text-slate-300">{tournament?.name ?? "No event"}</p>
               <p className="mt-1 text-xs text-slate-400">{subtitle}</p>
+              {moneyHole ? (
+                <div className="mt-3">
+                  <HarrysBigHole
+                    variant="compact"
+                    holeNumber={moneyHole.hole}
+                    roundNumber={moneyHole.round}
+                  />
+                </div>
+              ) : null}
             </div>
           </div>
           {(tournament?.status === "in_progress" || tournament?.status === "completed") ? (
@@ -674,6 +707,7 @@ function LineupViewerPage() {
                   bogeys: r.bogeys,
                   doubleBogeys: r.double_bogeys,
                   bonusPoints: r.bonus_points,
+                  moneyHolePoints: r.money_hole_points,
                 });
                 const pts = r.fantasy_points || bd.total;
                 const eagleCount = bd.eagleCount + bd.doubleEagleCount;
@@ -723,13 +757,14 @@ function LineupViewerPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-x-2 gap-y-2 text-xs sm:grid-cols-6">
+                    <div className="grid grid-cols-3 gap-x-2 gap-y-2 text-xs sm:grid-cols-7">
                       <MobileStat label="Birdies" count={bd.birdieCount} pts={bd.birdiePts} />
                       <MobileStat label="Eagles" count={eagleCount} pts={eaglePts} />
                       <MobileStat label="Pars" count={bd.parCount} pts={bd.parPts} />
                       <MobileStat label="Bogeys" count={bd.bogeyCount} pts={bd.bogeyPts} />
                       <MobileStat label="Dbl+" count={bd.doubleBogeyCount} pts={bd.doubleBogeyPts} />
                       <MobileBonusStat pts={bd.bonusPoints} breakdown={r.bonus_breakdown} />
+                      <MobileStat label="Money" pts={bd.moneyHolePoints} />
                     </div>
                   </div>
                 );
@@ -757,6 +792,7 @@ function LineupViewerPage() {
                     <th className="px-3 py-2 text-right">Bogeys</th>
                     <th className="px-3 py-2 text-right">Dbl+</th>
                     <th className="px-3 py-2 text-right">Bonus</th>
+                    <th className="px-3 py-2 text-right">Money</th>
                     <th className="px-4 py-2 text-right">Pts</th>
                   </tr>
                 </thead>
@@ -771,6 +807,7 @@ function LineupViewerPage() {
                       bogeys: r.bogeys,
                       doubleBogeys: r.double_bogeys,
                       bonusPoints: r.bonus_points,
+                      moneyHolePoints: r.money_hole_points,
                     });
                     const pts = r.fantasy_points || bd.total;
                     const eagleCount = bd.eagleCount + bd.doubleEagleCount;
@@ -821,6 +858,9 @@ function LineupViewerPage() {
                         <td className="px-3 py-3 text-right">
                           <BonusPts pts={bd.bonusPoints} breakdown={r.bonus_breakdown} />
                         </td>
+                        <td className="px-3 py-3 text-right">
+                          <StatPts pts={bd.moneyHolePoints} />
+                        </td>
                         <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-700">
                           {pts.toFixed(1)}
                         </td>
@@ -831,7 +871,7 @@ function LineupViewerPage() {
                 <tfoot>
                   <tr className="border-t bg-slate-50">
                     <td
-                      colSpan={10}
+                      colSpan={11}
                       className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500"
                     >
                       Total
@@ -845,8 +885,9 @@ function LineupViewerPage() {
             </div>
             <p className="border-t px-4 py-3 text-xs text-slate-500">
               Each column shows count (when applicable) and points earned. DK Classic: Eagle +8 ·
-              Birdie +3 · Par +0.5 · Bogey −0.5 · Double+ −1 · Place live (1st +30 … 50th +1). Tap
-              Bonus for streak / bogey-free / HIO breakdown.
+              Birdie +3 · Par +0.5 · Bogey −0.5 · Double+ −1 · Place live (1st +30 … 50th +1). Money
+              is the extra from the {MONEY_HOLE_MULTIPLIER}× money hole. Tap Bonus for streak /
+              bogey-free / HIO breakdown.
             </p>
           </>
         )}

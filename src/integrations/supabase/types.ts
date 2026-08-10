@@ -383,6 +383,7 @@ export type Database = {
           fantasy_points: number
           golfer_id: string
           made_cut: boolean
+          money_hole_points: number
           pars: number
           position: number | null
           rounds: Json
@@ -403,6 +404,7 @@ export type Database = {
           fantasy_points?: number
           golfer_id: string
           made_cut?: boolean
+          money_hole_points?: number
           pars?: number
           position?: number | null
           rounds?: Json
@@ -423,6 +425,7 @@ export type Database = {
           fantasy_points?: number
           golfer_id?: string
           made_cut?: boolean
+          money_hole_points?: number
           pars?: number
           position?: number | null
           rounds?: Json
@@ -505,6 +508,35 @@ export type Database = {
             foreignKeyName: "result_sync_state_tournament_id_fkey"
             columns: ["tournament_id"]
             isOneToOne: true
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tournament_money_holes: {
+        Row: {
+          created_at: string
+          hole_number: number
+          round_number: number
+          tournament_id: string
+        }
+        Insert: {
+          created_at?: string
+          hole_number: number
+          round_number: number
+          tournament_id: string
+        }
+        Update: {
+          created_at?: string
+          hole_number?: number
+          round_number?: number
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_money_holes_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
             referencedRelation: "tournaments"
             referencedColumns: ["id"]
           },
@@ -617,6 +649,7 @@ export type Database = {
           _double_bogeys?: number
           _double_eagles?: number
           _eagles?: number
+          _money_hole_points?: number
           _pars?: number
           _position: number
         }

@@ -7,14 +7,33 @@
 type EspnHole = {
   value?: number;
   displayValue?: string;
+  /** Actual hole number (1–18); correct even when starting on the back nine. */
+  period?: number;
   scoreType?: { displayValue?: string };
 };
 
 type EspnRound = {
   value?: number;
   displayValue?: string;
+  /** Round number (1–4). */
+  period?: number;
   linescores?: EspnHole[];
 };
+
+/** Round number → money hole (1–18). Missing rounds have no multiplier. */
+export type MoneyHolesByRound = ReadonlyMap<number, number>;
+
+export const MONEY_HOLE_MULTIPLIER = 3;
+
+/** DK Classic points for a single hole from relative-to-par. */
+export function holePointsFromRel(rel: number): number {
+  if (rel <= -3) return 13;
+  if (rel === -2) return 8;
+  if (rel === -1) return 3;
+  if (rel === 0) return 0.5;
+  if (rel === 1) return -0.5;
+  return -1;
+}
 
 type EspnCompetitor = {
   id?: string | number;
@@ -57,6 +76,11 @@ export type DkHoleStats = {
   /** Streak / bogey-free / HIO / all-4-under-70 bonus points. */
   bonusPoints: number;
   bonusBreakdown: DkBonusBreakdown;
+  /**
+   * Extra fantasy points from money-hole ×3 (base hole pts already in tallies).
+   * Can be negative when the money hole is a bogey / worse.
+   */
+  moneyHolePoints: number;
 };
 
 const EMPTY_BONUS: DkBonusBreakdown = {
@@ -75,6 +99,7 @@ const EMPTY_STATS: DkHoleStats = {
   doubleBogeys: 0,
   bonusPoints: 0,
   bonusBreakdown: EMPTY_BONUS,
+  moneyHolePoints: 0,
 };
 
 export type EspnAthleteRef = {
@@ -139,7 +164,10 @@ function hasBirdieOrBetterStreak(rels: number[]): boolean {
   return false;
 }
 
-function statsFromCompetitor(comp: EspnCompetitor): DkHoleStats {
+function statsFromCompetitor(
+  comp: EspnCompetitor,
+  moneyHoles?: MoneyHolesByRound,
+): DkHoleStats {
   let doubleEagles = 0;
   let eagles = 0;
   let birdies = 0;
@@ -149,14 +177,20 @@ function statsFromCompetitor(comp: EspnCompetitor): DkHoleStats {
   let holeInOnes = 0;
   let birdieStreakBonuses = 0;
   let bogeyFreeRounds = 0;
+  let moneyHolePoints = 0;
   const completedRoundStrokes: number[] = [];
 
-  for (const round of comp.linescores ?? []) {
+  for (const [roundIdx, round] of (comp.linescores ?? []).entries()) {
     const holes = round.linescores ?? [];
     const rels: number[] = [];
     let roundBogeys = 0;
+    const roundNumber =
+      typeof round.period === "number" && Number.isFinite(round.period)
+        ? Math.trunc(round.period)
+        : roundIdx + 1;
+    const moneyHole = moneyHoles?.get(roundNumber) ?? null;
 
-    for (const hole of holes) {
+    for (const [holeIdx, hole] of holes.entries()) {
       const rel = parseRelToPar(hole.scoreType?.displayValue);
       if (rel == null) continue;
       rels.push(rel);
@@ -175,6 +209,17 @@ function statsFromCompetitor(comp: EspnCompetitor): DkHoleStats {
 
       const strokes = typeof hole.value === "number" ? hole.value : Number(hole.displayValue);
       if (Number.isFinite(strokes) && strokes === 1) holeInOnes += 1;
+
+      if (moneyHole != null) {
+        const holeNumber =
+          typeof hole.period === "number" && Number.isFinite(hole.period)
+            ? Math.trunc(hole.period)
+            : holeIdx + 1;
+        if (holeNumber === moneyHole) {
+          // Tallies already include 1×; add the remaining (multiplier − 1)×.
+          moneyHolePoints += holePointsFromRel(rel) * (MONEY_HOLE_MULTIPLIER - 1);
+        }
+      }
     }
 
     if (rels.length === 18) {
@@ -220,6 +265,7 @@ function statsFromCompetitor(comp: EspnCompetitor): DkHoleStats {
     doubleBogeys,
     bonusPoints,
     bonusBreakdown,
+    moneyHolePoints,
   };
 }
 
@@ -282,31 +328,79 @@ async function fetchEspnScoreboard(dates?: string | null): Promise<EspnScoreboar
 }
 
 /**
+ * Highest round number that has at least one scored hole on the ESPN board.
+ * Used to reveal money holes day-by-day (round 1 before tee via caller).
+ */
+export function maxStartedRoundFromCompetitors(
+  competitors: { linescores?: EspnRound[] }[],
+): number {
+  let maxRound = 0;
+  for (const comp of competitors) {
+    for (const [roundIdx, round] of (comp.linescores ?? []).entries()) {
+      const holes = round.linescores ?? [];
+      const hasScore = holes.some((h) => parseRelToPar(h.scoreType?.displayValue) != null);
+      if (!hasScore) continue;
+      const roundNumber =
+        typeof round.period === "number" && Number.isFinite(round.period)
+          ? Math.trunc(round.period)
+          : roundIdx + 1;
+      if (roundNumber > maxRound) maxRound = roundNumber;
+    }
+  }
+  return maxRound;
+}
+
+export type EspnHoleStatsFetch = {
+  stats: Map<string, DkHoleStats>;
+  maxStartedRound: number;
+};
+
+/**
  * Fetch ESPN PGA scoreboard and build name → DK hole stats for the matching event.
  * Pass startDate (YYYY-MM-DD) so completed tournaments still resolve hole cards.
+ * Pass moneyHolesByRound so scores on that day's money hole earn ×3 hole points.
  */
 export async function fetchEspnHoleStatsMap(
   tournamentName: string,
-  opts?: { startDate?: string | null },
+  opts?: {
+    startDate?: string | null;
+    moneyHolesByRound?: MoneyHolesByRound;
+  },
 ): Promise<Map<string, DkHoleStats>> {
-  const map = new Map<string, DkHoleStats>();
+  const { stats } = await fetchEspnHoleStatsBundle(tournamentName, opts);
+  return stats;
+}
+
+/** Scoreboard fetch that also reports the highest started round (for money-hole reveal). */
+export async function fetchEspnHoleStatsBundle(
+  tournamentName: string,
+  opts?: {
+    startDate?: string | null;
+    moneyHolesByRound?: MoneyHolesByRound;
+  },
+): Promise<EspnHoleStatsFetch> {
+  const empty: EspnHoleStatsFetch = { stats: new Map(), maxStartedRound: 0 };
   const data = await fetchEspnScoreboard(opts?.startDate ?? null);
-  if (!data) return map;
+  if (!data) return empty;
   const event = pickEvent(data.events ?? [], tournamentName);
-  if (!event) return map;
+  if (!event) return empty;
   // Require a real name match for dated boards that may include multiple events.
   if (eventMatchScore(event, tournamentName) <= 0 && (data.events?.length ?? 0) > 1) {
-    return map;
+    return empty;
   }
   const competitors = event?.competitions?.[0]?.competitors ?? [];
+  const stats = new Map<string, DkHoleStats>();
   for (const comp of competitors) {
     const display = comp.athlete?.displayName ?? comp.athlete?.fullName;
     if (!display) continue;
     const key = normalizePlayerName(display);
     if (!key) continue;
-    map.set(key, statsFromCompetitor(comp));
+    stats.set(key, statsFromCompetitor(comp, opts?.moneyHolesByRound));
   }
-  return map;
+  return {
+    stats,
+    maxStartedRound: maxStartedRoundFromCompetitors(competitors),
+  };
 }
 
 /** Name → ESPN athlete id from the PGA scoreboard (matched to tournament when possible). */

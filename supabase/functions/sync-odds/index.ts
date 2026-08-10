@@ -16,6 +16,7 @@ import {
   type HybridSalaryInput,
 } from "../_shared/datagolf.ts";
 import { finalizeTournament, mapScheduleStatus } from "../_shared/finalize.ts";
+import { ensureMoneyHoles, moneyHoleUpToRound } from "../_shared/money_holes.ts";
 
 type ScheduleEvent = {
   event_id?: string | number;
@@ -217,6 +218,24 @@ Deno.serve(async (req) => {
       })
       .eq("id", tournamentId)
       .neq("status", "completed");
+
+    // Reveal today's money hole (and prior rounds) for the UI.
+    {
+      const { data: tMeta } = await admin
+        .from("tournaments")
+        .select("status, last_completed_round")
+        .eq("id", tournamentId)
+        .maybeSingle();
+      const fromDb = moneyHoleUpToRound({
+        status: String(tMeta?.status ?? activeStatus),
+        lastCompletedRound: tMeta?.last_completed_round ?? null,
+      });
+      const fromField =
+        fieldMeta.currentRound != null && fieldMeta.currentRound >= 1
+          ? Math.min(4, Math.trunc(fieldMeta.currentRound))
+          : 1;
+      await ensureMoneyHoles(admin, tournamentId, Math.max(fromDb, fromField));
+    }
 
     // Build odds map by dg_id
     const oddsByDg = new Map<string, number>();

@@ -8,6 +8,9 @@ export const SCORING = {
   doubleBogeyOrWorse: -1,
 } as const;
 
+/** Points multiplier on the daily money hole (hole scoring only). */
+export const MONEY_HOLE_MULTIPLIER = 3;
+
 /** DK Classic streak / achievement bonus point values. */
 export const BONUS_SCORING = {
   birdieStreak: 3,
@@ -120,6 +123,8 @@ export type DkScoringInput = {
   bogeys?: number;
   doubleBogeys?: number;
   bonusPoints?: number;
+  /** Extra pts from money-hole ×3 (base already in hole tallies). */
+  moneyHolePoints?: number;
   /** @deprecated Ignored — DK has no flat made-cut bonus. */
   madeCut?: boolean;
   /** @deprecated Ignored — DK has no under-par stroke bonus. */
@@ -134,6 +139,7 @@ export type FantasyPointsBreakdown = {
   finish: number;
   holePoints: number;
   bonusPoints: number;
+  moneyHolePoints: number;
   birdieCount: number;
   eagleCount: number;
   doubleEagleCount: number;
@@ -158,6 +164,7 @@ export function breakdownFantasyPoints(input: DkScoringInput): FantasyPointsBrea
   const bogeys = Math.max(input.bogeys ?? 0, 0);
   const doubleBogeys = Math.max(input.doubleBogeys ?? 0, 0);
   const bonusPoints = Math.max(input.bonusPoints ?? 0, 0);
+  const moneyHolePoints = input.moneyHolePoints ?? 0;
 
   const finish = finishPoints(input.position);
   const doubleEaglePts = doubleEagles * SCORING.doubleEagle;
@@ -173,6 +180,7 @@ export function breakdownFantasyPoints(input: DkScoringInput): FantasyPointsBrea
     finish,
     holePoints,
     bonusPoints,
+    moneyHolePoints,
     birdieCount: birdies,
     eagleCount: eagles,
     doubleEagleCount: doubleEagles,
@@ -185,7 +193,7 @@ export function breakdownFantasyPoints(input: DkScoringInput): FantasyPointsBrea
     parPts,
     bogeyPts,
     doubleBogeyPts,
-    total: finish + holePoints + bonusPoints,
+    total: finish + holePoints + bonusPoints + moneyHolePoints,
   };
 }
 
@@ -291,6 +299,15 @@ export function isLineupLocked(tournament: Pick<Tournament, "lineup_lock_at" | "
   if (tournament.status === "completed") return true;
   if (!tournament.lineup_lock_at) return false;
   return Date.now() >= new Date(tournament.lineup_lock_at).getTime();
+}
+
+/** Active money-hole round: next unfinished round, or 4 when the event is done. */
+export function currentMoneyHoleRound(
+  tournament: Pick<Tournament, "status" | "last_completed_round">,
+): number {
+  if (tournament.status === "completed") return 4;
+  const last = Math.max(0, Math.trunc(tournament.last_completed_round ?? 0));
+  return Math.min(4, Math.max(1, last + 1));
 }
 
 /** Closest event that is not completed (prefers in_progress / open, else nearest by start date). */

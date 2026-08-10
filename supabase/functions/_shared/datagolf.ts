@@ -721,6 +721,7 @@ export function computeFantasyPoints(input: {
   bogeys?: number;
   doubleBogeys?: number;
   bonusPoints?: number;
+  moneyHolePoints?: number;
 }): number {
   const doubleEagles = Math.max(input.doubleEagles ?? 0, 0);
   const eagles = Math.max(input.eagles ?? 0, 0);
@@ -729,6 +730,7 @@ export function computeFantasyPoints(input: {
   const bogeys = Math.max(input.bogeys ?? 0, 0);
   const doubleBogeys = Math.max(input.doubleBogeys ?? 0, 0);
   const bonusPoints = Math.max(input.bonusPoints ?? 0, 0);
+  const moneyHolePoints = input.moneyHolePoints ?? 0;
 
   return (
     finishPoints(input.position) +
@@ -738,6 +740,7 @@ export function computeFantasyPoints(input: {
     pars * DK_HOLE.par +
     bogeys * DK_HOLE.bogey +
     doubleBogeys * DK_HOLE.doubleBogeyOrWorse +
-    bonusPoints
+    bonusPoints +
+    moneyHolePoints
   );
 }

@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trophy, ArrowLeft, Zap, Medal, Eye, Copy, X, LogIn, Flame } from "lucide-react";
+import { Trophy, ArrowLeft, Zap, Medal, Eye, Copy, X, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import {
   isLineupLocked,
   pickActiveTournament,
   formatEventSeasonPtsLabel,
+  currentMoneyHoleRound,
   type Tournament,
 } from "@/lib/scoring";
 import { pickDayLeaderQuote } from "@/lib/day-leader-quotes";
@@ -29,7 +30,7 @@ import { SurfacePanel } from "@/components/surface-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { StatCard } from "@/components/stat-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { GolferAvatar } from "@/components/golfer-avatar";
+import { EventHighlightsCarousel } from "@/components/event-highlights-carousel";
 
 export const Route = createFileRoute("/_authenticated/league/$id")({
   component: LeaguePage,
@@ -41,6 +42,11 @@ type LeagueRow = {
   invite_code: string;
   salary_cap: number;
   max_players: number;
+};
+
+type MoneyHoleRow = {
+  round_number: number;
+  hole_number: number;
 };
 
 type EventStanding = {
@@ -126,6 +132,7 @@ function LeaguePage() {
   const [seasonStandings, setSeasonStandings] = useState<SeasonStanding[]>([]);
   const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
   const [showDayLeaderBanner, setShowDayLeaderBanner] = useState(false);
+  const [moneyHoles, setMoneyHoles] = useState<MoneyHoleRow[]>([]);
   const seasonYear = useMemo(() => new Date().getFullYear(), []);
 
   async function loadLeague() {
@@ -247,6 +254,20 @@ function LeaguePage() {
     );
   }
 
+  async function loadMoneyHoles(tournamentId: string) {
+    const { data } = await supabase
+      .from("tournament_money_holes")
+      .select("round_number, hole_number")
+      .eq("tournament_id", tournamentId)
+      .order("round_number", { ascending: true });
+    setMoneyHoles(
+      (data ?? []).map((r) => ({
+        round_number: Number(r.round_number),
+        hole_number: Number(r.hole_number),
+      })),
+    );
+  }
+
   async function loadTopScorers(tournamentId: string) {
     const { data: results } = await supabase
       .from("player_results")
@@ -316,6 +337,7 @@ function LeaguePage() {
     if (selectedTournamentId) {
       void loadEventStandings(selectedTournamentId);
       void loadTopScorers(selectedTournamentId);
+      void loadMoneyHoles(selectedTournamentId);
     }
     void loadSeasonStandings();
   });
@@ -324,10 +346,12 @@ function LeaguePage() {
     if (!selectedTournamentId) {
       setEventStandings([]);
       setTopScorers([]);
+      setMoneyHoles([]);
       return;
     }
     loadEventStandings(selectedTournamentId);
     loadTopScorers(selectedTournamentId);
+    loadMoneyHoles(selectedTournamentId);
 
     let eventTimer: ReturnType<typeof setTimeout> | undefined;
     let seasonTimer: ReturnType<typeof setTimeout> | undefined;
@@ -394,6 +418,11 @@ function LeaguePage() {
   const dayLeaderQuote =
     dayLeaderRound != null && dayLeaderRound >= 1 && selectedTournament
       ? pickDayLeaderQuote(id, selectedTournament.id, dayLeaderRound)
+      : null;
+  const moneyHoleRound = selectedTournament ? currentMoneyHoleRound(selectedTournament) : null;
+  const todaysMoneyHole =
+    moneyHoleRound != null
+      ? (moneyHoles.find((h) => h.round_number === moneyHoleRound) ?? null)
       : null;
 
   useEffect(() => {
@@ -635,55 +664,22 @@ function LeaguePage() {
             )}
           </div>
 
-          {topScorers.length > 0 ? (
-            <SurfacePanel
-              icon={<Flame className="h-5 w-5" />}
-              title="Fantasy Points Leaders"
-              meta={
-                selectedTournament?.status === "in_progress" ? (
-                  <StatusBadge tone="live">Live</StatusBadge>
-                ) : selectedTournament?.status === "completed" ? (
-                  "Final"
-                ) : (
-                  "Field"
-                )
+          {(todaysMoneyHole && moneyHoleRound != null) || topScorers.length > 0 ? (
+            <EventHighlightsCarousel
+              moneyHole={
+                todaysMoneyHole && moneyHoleRound != null
+                  ? {
+                      hole_number: todaysMoneyHole.hole_number,
+                      round_number: moneyHoleRound,
+                    }
+                  : null
               }
-            >
-              <div className="grid gap-0 sm:grid-cols-3 sm:divide-x">
-                {topScorers.map((g, i) => (
-                  <div
-                    key={g.golfer_id}
-                    className={`flex items-center gap-3 px-4 py-3 sm:px-5 ${
-                      i === 0 ? "bg-brand-muted/35 sm:rounded-none" : ""
-                    }`}
-                  >
-                    <div
-                      className={`grid h-7 w-7 shrink-0 place-items-center rounded-full font-mono text-xs font-bold ${
-                        i === 0
-                          ? "bg-primary/15 text-primary"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {i + 1}
-                    </div>
-                    <GolferAvatar name={g.name} pgaPlayerNum={g.pga_player_num} size="md" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium leading-tight">{g.name}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {formatPos(g.position, g.status)} · {formatToPar(g.total_to_par)}
-                        {g.onYourLineup ? " · Your pick" : ""}
-                        {!g.onYourLineup && g.lineupCount > 1 && g.pickCount > 0
-                          ? ` · ${g.pickCount}/${g.lineupCount} own`
-                          : ""}
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-right font-mono text-lg font-semibold tabular-nums text-success">
-                      {g.fantasy_points.toFixed(1)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </SurfacePanel>
+              moneyHoleHistory={moneyHoles}
+              topScorers={topScorers}
+              tournamentStatus={selectedTournament?.status}
+              formatPos={formatPos}
+              formatToPar={formatToPar}
+            />
           ) : null}
 
           <SurfacePanel

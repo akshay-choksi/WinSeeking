@@ -10,14 +10,17 @@ import {
 } from "../_shared/datagolf.ts";
 import {
   fetchEspnAthleteIdMap,
-  fetchEspnHoleStatsMap,
+  fetchEspnHoleStatsBundle,
   lookupHoleStats,
   normalizePlayerName,
   type DkHoleStats,
 } from "../_shared/espn.ts";
 import { detectEventFinal, finalizeTournament, mapScheduleStatus } from "../_shared/finalize.ts";
+import { ensureMoneyHoles, moneyHoleUpToRound } from "../_shared/money_holes.ts";
 
 type InPlayPlayer = Record<string, unknown>;
+
+type AdminClient = ReturnType<typeof adminClient>;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -52,12 +55,15 @@ Deno.serve(async (req) => {
       season_year: number;
       start_date: string | null;
       lineup_lock_at: string | null;
+      last_completed_round: number | null;
     } | null = null;
 
     if (tournamentId) {
       const { data, error } = await admin
         .from("tournaments")
-        .select("id, name, dg_event_id, status, season_year, start_date, lineup_lock_at")
+        .select(
+          "id, name, dg_event_id, status, season_year, start_date, lineup_lock_at, last_completed_round",
+        )
         .eq("id", tournamentId)
         .maybeSingle();
       if (error) throw new Error(error.message);
@@ -65,7 +71,9 @@ Deno.serve(async (req) => {
     } else {
       const { data, error } = await admin
         .from("tournaments")
-        .select("id, name, dg_event_id, status, season_year, start_date, lineup_lock_at")
+        .select(
+          "id, name, dg_event_id, status, season_year, start_date, lineup_lock_at, last_completed_round",
+        )
         .in("status", ["open", "in_progress"])
         .order("start_date", { ascending: false })
         .limit(1)
@@ -166,9 +174,29 @@ Deno.serve(async (req) => {
     // In-play positions/scores from DataGolf; hole tallies from ESPN scorecards.
     // Completed events: DataGolf in-play is the *current* tournament — only backfill
     // hole tallies from ESPN's dated scoreboard onto existing player_results.
-    const holeStatsMap = await fetchEspnHoleStatsMap(tournament.name, {
-      startDate: tournament.start_date,
+    const baseUpTo = moneyHoleUpToRound({
+      status: tournament.status,
+      lastCompletedRound: tournament.last_completed_round,
     });
+    let moneyHolesByRound = await ensureMoneyHoles(admin, tournament.id, baseUpTo);
+    let { stats: holeStatsMap, maxStartedRound } = await fetchEspnHoleStatsBundle(
+      tournament.name,
+      {
+        startDate: tournament.start_date,
+        moneyHolesByRound,
+      },
+    );
+    const neededUpTo = Math.max(baseUpTo, maxStartedRound, 1);
+    const haveMax = moneyHolesByRound.size
+      ? Math.max(...moneyHolesByRound.keys())
+      : 0;
+    if (neededUpTo > haveMax) {
+      moneyHolesByRound = await ensureMoneyHoles(admin, tournament.id, neededUpTo);
+      ({ stats: holeStatsMap } = await fetchEspnHoleStatsBundle(tournament.name, {
+        startDate: tournament.start_date,
+        moneyHolesByRound,
+      }));
+    }
 
     const isCompleted = tournament.status === "completed";
     let inPlayRaw: unknown = null;
@@ -327,6 +355,7 @@ Deno.serve(async (req) => {
       double_eagles: number;
       bonus_points: number;
       bonus_breakdown: DkHoleStats["bonusBreakdown"];
+      money_hole_points: number;
       rounds: unknown;
       fantasy_points: number;
       status: string | null;
@@ -372,6 +401,7 @@ Deno.serve(async (req) => {
         bogeys: holes.bogeys,
         doubleBogeys: holes.doubleBogeys,
         bonusPoints: holes.bonusPoints,
+        moneyHolePoints: holes.moneyHolePoints,
       });
 
       resultRows.push({
@@ -388,6 +418,7 @@ Deno.serve(async (req) => {
         double_eagles: holes.doubleEagles,
         bonus_points: holes.bonusPoints,
         bonus_breakdown: holes.bonusBreakdown,
+        money_hole_points: holes.moneyHolePoints,
         rounds,
         fantasy_points: pts,
         status: missedCut ? posText || statusRaw || "CUT" : statusRaw || null,
@@ -553,8 +584,6 @@ function extractInPlayEventId(raw: unknown): string | null {
   return null;
 }
 
-type AdminClient = ReturnType<typeof adminClient>;
-
 /** Patch hole tallies + fantasy points on existing results using ESPN scorecards. */
 async function backfillHoleStatsFromEspn(opts: {
   admin: AdminClient;
@@ -587,6 +616,7 @@ async function backfillHoleStatsFromEspn(opts: {
     double_eagles: number;
     bonus_points: number;
     bonus_breakdown: DkHoleStats["bonusBreakdown"];
+    money_hole_points: number;
     rounds: unknown;
     fantasy_points: number;
     status: string | null;
@@ -615,6 +645,7 @@ async function backfillHoleStatsFromEspn(opts: {
       bogeys: holes.bogeys,
       doubleBogeys: holes.doubleBogeys,
       bonusPoints: holes.bonusPoints,
+      moneyHolePoints: holes.moneyHolePoints,
     });
 
     rows.push({
@@ -631,6 +662,7 @@ async function backfillHoleStatsFromEspn(opts: {
       double_eagles: holes.doubleEagles,
       bonus_points: holes.bonusPoints,
       bonus_breakdown: holes.bonusBreakdown,
+      money_hole_points: holes.moneyHolePoints,
       rounds: row.rounds,
       fantasy_points: pts,
       status: (row.status as string | null) ?? null,
