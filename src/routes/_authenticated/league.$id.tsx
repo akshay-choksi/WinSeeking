@@ -28,7 +28,6 @@ import { initialsFromName } from "@/lib/profile";
 import { PageHeader } from "@/components/page-header";
 import { SurfacePanel } from "@/components/surface-panel";
 import { StatusBadge } from "@/components/status-badge";
-import { StatCard } from "@/components/stat-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EventHighlightsCarousel } from "@/components/event-highlights-carousel";
 
@@ -409,6 +408,9 @@ function LeaguePage() {
   const locked = selectedTournament ? isLineupLocked(selectedTournament) : false;
   const leaderPts = eventStandings[0]?.total_points;
   const yourStanding = eventStandings.find((s) => s.user_id === user?.id);
+  const yourEventRank = yourStanding
+    ? eventStandings.findIndex((s) => s.user_id === user?.id) + 1
+    : null;
   const dayLeaderRound = selectedTournament?.last_completed_round ?? null;
   const dayLeader = eventStandings[0] ?? null;
   const dayLeaderTied =
@@ -595,29 +597,35 @@ function LeaguePage() {
             </div>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <StatCard
-              label="Event entries"
-              value={eventStandings.length}
-              hint={selectedTournament?.name ?? "Select an event"}
-            />
-            <StatCard
-              label="Leader"
-              value={leaderPts != null ? leaderPts.toFixed(1) : "—"}
-              hint={eventStandings[0]?.full_name ?? "No lineups yet"}
-              tone="success"
-            />
-            <StatCard
-              label="Your points"
-              value={yourStanding ? yourStanding.total_points.toFixed(1) : "—"}
-              hint={
-                yourStanding
-                  ? `#${eventStandings.findIndex((s) => s.user_id === user?.id) + 1} this event`
-                  : "No lineup submitted"
-              }
-              tone="navy"
-            />
-          </div>
+          <SurfacePanel
+            title={selectedTournament?.name ?? "Select an event"}
+            meta={`${eventStandings.length} ${eventStandings.length === 1 ? "entry" : "entries"}`}
+          >
+            <div className="grid sm:grid-cols-2">
+              <div className="bg-navy px-5 py-4 text-navy-foreground">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-navy-foreground/70">
+                  Your points
+                </p>
+                <p className="mt-1 text-2xl font-bold tracking-tight tabular-nums">
+                  {yourStanding ? yourStanding.total_points.toFixed(1) : "—"}
+                </p>
+                <p className="mt-1 text-xs text-navy-foreground/65">
+                  {yourEventRank != null ? `#${yourEventRank} this event` : "No lineup submitted"}
+                </p>
+              </div>
+              <div className="border-t border-primary/15 bg-brand-muted/40 px-5 py-4 sm:border-l sm:border-t-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Leader
+                </p>
+                <p className="mt-1 text-2xl font-bold tracking-tight tabular-nums text-success">
+                  {leaderPts != null ? leaderPts.toFixed(1) : "—"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {eventStandings[0]?.full_name ?? "No lineups yet"}
+                </p>
+              </div>
+            </div>
+          </SurfacePanel>
         </>
       )}
 
