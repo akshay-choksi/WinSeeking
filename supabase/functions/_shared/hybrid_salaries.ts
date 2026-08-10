@@ -22,7 +22,7 @@ export const HYBRID_RANK_BLEND = 0.7;
 export const HYBRID_CURVE_POWER = 1.2;
 
 export const HYBRID_MIN_SALARY = 6900;
-export const HYBRID_MAX_SALARY = 11300;
+export const HYBRID_MAX_SALARY = 11100;
 
 export type HybridSalaryInput = {
   dgId: string;
@@ -63,7 +63,7 @@ function maxNormalize(values: Map<string, number>): Map<string, number> {
  * Missing components renormalize remaining weights. Players with zero signals are omitted
  * (caller should fall back to a default salary).
  *
- * Maps field percentile (primary) + relative composite (secondary) into [$6.9k, $11.3k].
+ * Maps field percentile (primary) + relative composite (secondary) into [$6.9k, $11.1k].
  * Favorites slope down through the top tier; mid-tier stays playable; longshots cost real
  * money (~floor+). Cap math (~$8.3k/roster slot) is tight but a one-stud build fits.
  */
