@@ -276,40 +276,21 @@ export function extractDecimalOdds(row: Record<string, unknown>): number | null 
   return values[Math.floor(values.length / 2)];
 }
 
-/** Hybrid salary weights: market / course-win / rank / form. */
-export const HYBRID_WEIGHTS = {
-  market: 0.4,
-  courseWin: 0.35,
-  rank: 0.15,
-  form: 0.1,
-} as const;
-
-/**
- * Salary curve exponent on relative composite (0–1).
- * Slightly above 1 gives mild tiers: favorites cost more with small within-tier
- * stagger, without turning modest odds gaps into multi-thousand salary jumps.
- */
-export const HYBRID_CURVE_POWER = 1.2;
-
-export type HybridSalaryInput = {
-  dgId: string;
-  decimalOdds?: number | null;
-  /** Course-history + fit model win probability (0–1). */
-  courseWinProb?: number | null;
-  /** Baseline make-cut probability (0–1). */
-  makeCutProb?: number | null;
-  /** Baseline top-5 probability (0–1). */
-  top5Prob?: number | null;
-  owgrRank?: number | null;
-  dgRank?: number | null;
-};
-
-export type HybridSalaryResult = {
-  salary: number;
-  impliedProb: number | null;
-  decimalOdds: number | null;
-  composite: number;
-};
+export {
+  HYBRID_WEIGHTS,
+  HYBRID_RANK_POWER,
+  HYBRID_COMP_POWER,
+  HYBRID_RANK_BLEND,
+  HYBRID_CURVE_POWER,
+  HYBRID_MIN_SALARY,
+  HYBRID_MAX_SALARY,
+  computeHybridSalaries,
+  oddsToSalaries,
+} from "./hybrid_salaries.ts";
+export type {
+  HybridSalaryInput,
+  HybridSalaryResult,
+} from "./hybrid_salaries.ts";
 
 function asFiniteNumber(raw: unknown): number | null {
   if (typeof raw === "number" && Number.isFinite(raw)) return raw;
@@ -527,132 +508,6 @@ export function parsePlayerList(raw: unknown): Map<string, DgPlayerListEntry> {
       isAmateur = amRaw !== 0;
     }
     out.set(dgId, { dgId, country, isAmateur });
-  }
-  return out;
-}
-
-function maxNormalize(values: Map<string, number>): Map<string, number> {
-  let max = 0;
-  for (const v of values.values()) {
-    if (v > max) max = v;
-  }
-  const out = new Map<string, number>();
-  if (max <= 0) {
-    for (const id of values.keys()) out.set(id, 0);
-    return out;
-  }
-  for (const [id, v] of values) out.set(id, v / max);
-  return out;
-}
-
-/**
- * Hybrid salaries: blend market odds, DG course-win, OWGR/DG rank, and form (make-cut/top-5).
- * Missing components renormalize remaining weights. Players with zero signals are omitted
- * (caller should fall back to a default salary).
- *
- * Maps relative composite through a mild convex curve into [$7k, $11.5k] (~$4.5k spread)
- * so top favorites are disadvantageous but playable, and stacked chalk exceeds the $50k cap.
- */
-export function computeHybridSalaries(
-  players: HybridSalaryInput[],
-  opts: { minSalary?: number; maxSalary?: number; step?: number; power?: number } = {},
-): Map<string, HybridSalaryResult> {
-  const minSalary = opts.minSalary ?? 7000;
-  const maxSalary = opts.maxSalary ?? 11500;
-  const step = opts.step ?? 100;
-  const power = opts.power ?? HYBRID_CURVE_POWER;
-
-  const marketRaw = new Map<string, number>();
-  const courseRaw = new Map<string, number>();
-  const rankRaw = new Map<string, number>();
-  const formRaw = new Map<string, number>();
-  const oddsById = new Map<string, number>();
-
-  for (const p of players) {
-    if (p.decimalOdds != null && Number.isFinite(p.decimalOdds) && p.decimalOdds > 1) {
-      marketRaw.set(p.dgId, 1 / p.decimalOdds);
-      oddsById.set(p.dgId, p.decimalOdds);
-    }
-    if (p.courseWinProb != null && p.courseWinProb > 0) {
-      courseRaw.set(p.dgId, p.courseWinProb);
-    }
-    const ranks = [p.owgrRank, p.dgRank].filter((r): r is number => r != null && r > 0);
-    if (ranks.length > 0) {
-      const best = Math.min(...ranks);
-      rankRaw.set(p.dgId, 1 / best);
-    }
-    const makeCut = p.makeCutProb;
-    const top5 = p.top5Prob;
-    if (makeCut != null || top5 != null) {
-      const mc = makeCut ?? 0;
-      const t5 = top5 ?? 0;
-      // Prefer make-cut when only one exists; otherwise 0.6 / 0.4 blend.
-      const form =
-        makeCut != null && top5 != null ? 0.6 * mc + 0.4 * t5 : makeCut != null ? mc : t5;
-      if (form > 0) formRaw.set(p.dgId, form);
-    }
-  }
-
-  const marketN = maxNormalize(marketRaw);
-  const courseN = maxNormalize(courseRaw);
-  const rankN = maxNormalize(rankRaw);
-  const formN = maxNormalize(formRaw);
-
-  const marketSum = [...marketRaw.values()].reduce((s, v) => s + v, 0) || 1;
-
-  const composites = new Map<string, number>();
-  for (const p of players) {
-    const parts: { w: number; v: number }[] = [];
-    if (marketN.has(p.dgId)) parts.push({ w: HYBRID_WEIGHTS.market, v: marketN.get(p.dgId)! });
-    if (courseN.has(p.dgId)) parts.push({ w: HYBRID_WEIGHTS.courseWin, v: courseN.get(p.dgId)! });
-    if (rankN.has(p.dgId)) parts.push({ w: HYBRID_WEIGHTS.rank, v: rankN.get(p.dgId)! });
-    if (formN.has(p.dgId)) parts.push({ w: HYBRID_WEIGHTS.form, v: formN.get(p.dgId)! });
-    if (parts.length === 0) continue;
-    const wSum = parts.reduce((s, x) => s + x.w, 0) || 1;
-    const composite = parts.reduce((s, x) => s + (x.w / wSum) * x.v, 0);
-    composites.set(p.dgId, composite);
-  }
-
-  if (composites.size === 0) return new Map();
-
-  let maxC = 0;
-  for (const v of composites.values()) {
-    if (v > maxC) maxC = v;
-  }
-  if (maxC <= 0) maxC = 1e-9;
-
-  const out = new Map<string, HybridSalaryResult>();
-  for (const [dgId, composite] of composites) {
-    const relative = composite / maxC;
-    const ratio = Math.pow(relative, power);
-    let salary = minSalary + (maxSalary - minSalary) * ratio;
-    salary = Math.round(salary / step) * step;
-    salary = Math.min(maxSalary, Math.max(minSalary, salary));
-
-    const decimalOdds = oddsById.get(dgId) ?? null;
-    const impliedProb = decimalOdds != null ? (1 / decimalOdds) / marketSum : null;
-
-    out.set(dgId, { salary, impliedProb, decimalOdds, composite });
-  }
-  return out;
-}
-
-/** @deprecated Prefer computeHybridSalaries — kept as market-only hybrid wrapper. */
-export function oddsToSalaries(
-  players: { dgId: string; decimalOdds: number }[],
-  opts: { minSalary?: number; maxSalary?: number; step?: number } = {},
-): Map<string, { salary: number; impliedProb: number; decimalOdds: number }> {
-  const hybrid = computeHybridSalaries(
-    players.map((p) => ({ dgId: p.dgId, decimalOdds: p.decimalOdds })),
-    opts,
-  );
-  const out = new Map<string, { salary: number; impliedProb: number; decimalOdds: number }>();
-  for (const [dgId, row] of hybrid) {
-    out.set(dgId, {
-      salary: row.salary,
-      impliedProb: row.impliedProb ?? 0,
-      decimalOdds: row.decimalOdds ?? players.find((p) => p.dgId === dgId)!.decimalOdds,
-    });
   }
   return out;
 }
