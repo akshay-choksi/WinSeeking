@@ -105,9 +105,6 @@ export function HarrysBigHole({
         <h2 className="mt-0.5 font-serif text-xl font-bold tracking-tight text-white sm:text-2xl">
           Harry&apos;s Big Hole
         </h2>
-        <p className="mt-1.5 max-w-xs text-xs leading-snug text-navy-foreground/70 sm:text-[13px]">
-          3x points for all golfers on this one hole.
-        </p>
 
         <div className="mt-3 flex flex-col items-center">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-amber-300 via-amber-400 to-amber-600 text-navy sm:h-12 sm:w-12">

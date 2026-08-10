@@ -547,31 +547,6 @@ function LeaguePage() {
                 )}
               </div>
             }
-            actions={
-              locked ? (
-                user && (
-                  <Button size="lg" variant="outline" asChild>
-                    <Link
-                      to="/league/$id/lineup/$userId"
-                      params={{ id, userId: user.id }}
-                      search={{ tournament: selectedTournamentId ?? undefined }}
-                    >
-                      <Eye className="mr-2 h-4 w-4" /> View my lineup
-                    </Link>
-                  </Button>
-                )
-              ) : (
-                <Button size="lg" asChild>
-                  <Link
-                    to="/league/$id/draft"
-                    params={{ id }}
-                    search={{ tournament: selectedTournamentId ?? undefined }}
-                  >
-                    <Zap className="mr-2 h-4 w-4" /> Set lineup
-                  </Link>
-                </Button>
-              )
-            }
           />
 
           {showDayLeaderBanner && dayLeader && dayLeaderRound != null && dayLeaderQuote && (
@@ -601,7 +576,7 @@ function LeaguePage() {
             title={selectedTournament?.name ?? "Select an event"}
             meta={`${eventStandings.length} ${eventStandings.length === 1 ? "entry" : "entries"}`}
           >
-            <div className="grid sm:grid-cols-2">
+            <div className="grid grid-cols-2">
               <div className="bg-navy px-5 py-4 text-navy-foreground">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-navy-foreground/70">
                   Your points
@@ -613,18 +588,44 @@ function LeaguePage() {
                   {yourEventRank != null ? `#${yourEventRank} this event` : "No lineup submitted"}
                 </p>
               </div>
-              <div className="border-t border-primary/15 bg-brand-muted/40 px-5 py-4 sm:border-l sm:border-t-0">
+              <div className="border-l border-primary/15 bg-brand-muted/40 px-5 py-4">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Leader
                 </p>
                 <p className="mt-1 text-2xl font-bold tracking-tight tabular-nums text-success">
                   {leaderPts != null ? leaderPts.toFixed(1) : "—"}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 truncate text-xs text-muted-foreground">
                   {eventStandings[0]?.full_name ?? "No lineups yet"}
                 </p>
               </div>
             </div>
+            {(!locked || user) && (
+              <div className="border-t border-border/80 px-4 py-3">
+                {locked && user ? (
+                  <Button className="w-full sm:w-auto" variant="outline" asChild>
+                    <Link
+                      to="/league/$id/lineup/$userId"
+                      params={{ id, userId: user.id }}
+                      search={{ tournament: selectedTournamentId ?? undefined }}
+                    >
+                      <Eye className="mr-2 h-4 w-4" /> View my lineup
+                    </Link>
+                  </Button>
+                ) : !locked ? (
+                  <Button className="w-full sm:w-auto" asChild>
+                    <Link
+                      to="/league/$id/draft"
+                      params={{ id }}
+                      search={{ tournament: selectedTournamentId ?? undefined }}
+                    >
+                      <Zap className="mr-2 h-4 w-4" />
+                      {yourStanding ? "Edit lineup" : "Set lineup"}
+                    </Link>
+                  </Button>
+                ) : null}
+              </div>
+            )}
           </SurfacePanel>
         </>
       )}
