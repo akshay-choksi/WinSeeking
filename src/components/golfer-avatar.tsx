@@ -19,7 +19,7 @@ export function GolferAvatar({ name, pgaPlayerNum, className, size = "sm" }: Gol
     return (
       <span
         className={cn(
-          "grid shrink-0 place-items-center rounded bg-slate-100 text-xs font-bold text-slate-600",
+          "grid shrink-0 place-items-center rounded bg-muted text-xs font-bold text-muted-foreground",
           dim,
           className,
         )}

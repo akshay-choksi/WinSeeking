@@ -10,6 +10,7 @@ import { GolferAvatar } from "@/components/golfer-avatar";
 import { GolferInfoButton } from "@/components/golfer-info";
 import { GolferName } from "@/components/golfer-name";
 import { StatusBadge } from "@/components/status-badge";
+import { StatCard } from "@/components/stat-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   bonusBreakdownLines,
@@ -150,8 +151,8 @@ function toGolferInfo(r: GolferRow) {
 function StatPts({ count, pts }: { count?: number; pts: number }) {
   return (
     <span className="inline-flex flex-col items-end gap-0.5 leading-tight">
-      {count != null ? <span className="font-mono text-slate-800">{count}</span> : null}
-      <span className={`font-mono text-xs ${pts < 0 ? "text-red-600" : "text-emerald-700/80"}`}>
+      {count != null ? <span className="font-mono text-foreground">{count}</span> : null}
+      <span className={`font-mono text-xs ${pts < 0 ? "text-destructive" : "text-success"}`}>
         {formatPts(pts)}
       </span>
     </span>
@@ -179,8 +180,8 @@ function BonusBreakdownBody({
     <ul className="space-y-1.5">
       {lines.map((line) => (
         <li key={line.label} className="flex items-center justify-between gap-4 text-xs">
-          <span className="text-slate-700">{line.label}</span>
-          <span className="font-mono font-medium text-emerald-700">{formatPts(line.pts)}</span>
+          <span className="text-foreground">{line.label}</span>
+          <span className="font-mono font-medium text-success">{formatPts(line.pts)}</span>
         </li>
       ))}
     </ul>
@@ -200,13 +201,13 @@ function BonusPts({ pts, breakdown }: { pts: number; breakdown: BonusBreakdown |
           className="inline-flex rounded-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Bonus points breakdown"
         >
-          <span className="underline decoration-dotted decoration-emerald-600/50 underline-offset-2">
+          <span className="underline decoration-dotted decoration-primary/50 underline-offset-2">
             <StatPts pts={pts} />
           </span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-56 p-3">
-        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           Bonus breakdown
         </div>
         <BonusBreakdownBody pts={pts} breakdown={breakdown} />
@@ -602,7 +603,7 @@ function LineupViewerPage() {
           <ArrowLeft className="h-4 w-4" /> Back to league
         </Link>
         <div className="rounded-lg border bg-card p-8 text-center">
-          <Lock className="mx-auto mb-3 h-10 w-10 text-amber-600" />
+          <Lock className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
           <h2 className="text-lg font-bold">Lineups still open</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Other members&apos; lineups stay hidden until lock (first tee). You can always open yours
@@ -623,22 +624,22 @@ function LineupViewerPage() {
         <ArrowLeft className="h-4 w-4" /> {leagueName}
       </Link>
 
-      <div className="rounded-lg bg-slate-900 px-5 py-5 text-white">
+      <div className="rounded-lg bg-navy px-5 py-5 text-navy-foreground shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <Avatar className="mt-0.5 h-12 w-12 border border-white/20">
               {ownerAvatarUrl ? <AvatarImage src={ownerAvatarUrl} alt="" /> : null}
-              <AvatarFallback className="bg-white/10 text-sm font-semibold text-white">
+              <AvatarFallback className="bg-white/10 text-sm font-semibold text-navy-foreground">
                 {initialsFromName(ownerName)}
               </AvatarFallback>
             </Avatar>
             <div>
-              <p className="text-xs uppercase tracking-wide text-slate-400">
+              <p className="text-xs font-semibold uppercase tracking-wider text-success">
                 {isOwn ? "Your lineup" : "Member lineup"}
               </p>
               <h1 className="mt-1 text-2xl font-bold tracking-tight">{ownerName}</h1>
-              <p className="mt-1 text-sm text-slate-300">{tournament?.name ?? "No event"}</p>
-              <p className="mt-1 text-xs text-slate-400">{subtitle}</p>
+              <p className="mt-1 text-sm text-navy-foreground/75">{tournament?.name ?? "No event"}</p>
+              <p className="mt-1 text-xs text-navy-foreground/55">{subtitle}</p>
               {moneyHole ? (
                 <div className="mt-3">
                   <HarrysBigHole
@@ -658,7 +659,7 @@ function LineupViewerPage() {
                 size="sm"
                 onClick={refreshLiveScores}
                 disabled={refreshing}
-                className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                className="border-white/20 bg-white/10 text-navy-foreground hover:bg-white/20 hover:text-navy-foreground"
               >
                 <RefreshCw className={refreshing ? "animate-spin" : ""} />
                 {refreshing
@@ -667,7 +668,7 @@ function LineupViewerPage() {
                     ? "Refresh scores"
                     : "Refresh live scores"}
               </Button>
-              <p className="mt-1.5 text-[11px] text-slate-400">
+              <p className="mt-1.5 text-[11px] text-navy-foreground/55">
                 {lastSyncedAt
                   ? `Updated ${new Date(lastSyncedAt).toLocaleTimeString()}`
                   : "Pull down to refresh · or tap"}
@@ -675,21 +676,23 @@ function LineupViewerPage() {
             </div>
           ) : null}
         </div>
-        <div className="mt-4 flex flex-wrap gap-6">
-          <div>
-            <div className="text-xs uppercase text-slate-400">Lineup points</div>
-            <div className="font-mono text-2xl font-bold text-emerald-400">
-              {lineupTotal.toFixed(1)}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs uppercase text-slate-400">Spent</div>
-            <div className="font-mono text-2xl font-bold">${totalSpent.toLocaleString()}</div>
-          </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 sm:max-w-md">
+          <StatCard
+            label="Lineup points"
+            value={lineupTotal.toFixed(1)}
+            tone="navy"
+            className="border-white/10 bg-white/5 shadow-none"
+          />
+          <StatCard
+            label="Spent"
+            value={`$${totalSpent.toLocaleString()}`}
+            tone="navy"
+            className="border-white/10 bg-white/5 shadow-none"
+          />
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border bg-white">
+      <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
         {rows.length === 0 ? (
           <div className="p-10 text-center text-sm text-muted-foreground">
             No lineup submitted for this event.
@@ -719,41 +722,41 @@ function LineupViewerPage() {
                       <GolferAvatar name={r.name} pgaPlayerNum={r.pga_player_num} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1">
-                          <GolferName name={r.name} className="font-medium text-slate-900" />
+                          <GolferName name={r.name} className="font-medium text-foreground" />
                           <GolferInfoButton golfer={toGolferInfo(r)} />
                         </div>
                         <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-muted-foreground">
                             {formatAmericanOdds(r.decimal_odds)} · {formatOwgr(r.owgr_rank)}
                           </span>
                           <OwnershipBadge pickCount={r.pickCount} lineupCount={r.lineupCount} />
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-mono text-lg font-bold text-emerald-700">
+                        <div className="font-mono text-lg font-bold text-success">
                           {pts.toFixed(1)}
                         </div>
-                        <div className="text-[10px] uppercase tracking-wide text-slate-400">
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                           pts
                         </div>
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                      <div className="rounded-lg bg-slate-50 px-2 py-2">
-                        <div className="text-[10px] uppercase text-slate-400">Pos</div>
-                        <div className="font-mono font-semibold text-slate-800">
+                      <div className="rounded-lg bg-muted/50 px-2 py-2">
+                        <div className="text-[10px] uppercase text-muted-foreground">Pos</div>
+                        <div className="font-mono font-semibold text-foreground">
                           {formatPos(r.position, r.status)}
                         </div>
                       </div>
-                      <div className="rounded-lg bg-slate-50 px-2 py-2">
-                        <div className="text-[10px] uppercase text-slate-400">Score</div>
-                        <div className="font-mono font-semibold text-slate-800">
+                      <div className="rounded-lg bg-muted/50 px-2 py-2">
+                        <div className="text-[10px] uppercase text-muted-foreground">Score</div>
+                        <div className="font-mono font-semibold text-foreground">
                           {formatToPar(r.total_to_par)}
                         </div>
                       </div>
-                      <div className="rounded-lg bg-slate-50 px-2 py-2">
-                        <div className="text-[10px] uppercase text-slate-400">Place</div>
-                        <div className="font-mono font-semibold text-emerald-700">
+                      <div className="rounded-lg bg-muted/50 px-2 py-2">
+                        <div className="text-[10px] uppercase text-muted-foreground">Place</div>
+                        <div className="font-mono font-semibold text-success">
                           {formatPts(bd.finish)}
                         </div>
                       </div>
@@ -770,9 +773,9 @@ function LineupViewerPage() {
                   </div>
                 );
               })}
-              <div className="flex items-center justify-between bg-slate-50 px-4 py-3">
-                <span className="text-xs font-semibold uppercase text-slate-500">Total</span>
-                <span className="font-mono text-lg font-bold text-emerald-700">
+              <div className="flex items-center justify-between bg-muted/50 px-4 py-3">
+                <span className="text-xs font-semibold uppercase text-muted-foreground">Total</span>
+                <span className="font-mono text-lg font-bold text-success">
                   {lineupTotal.toFixed(1)}
                 </span>
               </div>
@@ -781,7 +784,7 @@ function LineupViewerPage() {
             {/* Desktop table */}
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2">Golfer</th>
                     <th className="px-3 py-2 text-right">Pos</th>
@@ -820,11 +823,11 @@ function LineupViewerPage() {
                             <GolferAvatar name={r.name} pgaPlayerNum={r.pga_player_num} />
                             <div className="min-w-0">
                               <div className="flex items-center gap-1">
-                                <GolferName name={r.name} className="font-medium text-slate-900" />
+                                <GolferName name={r.name} className="font-medium text-foreground" />
                                 <GolferInfoButton golfer={toGolferInfo(r)} />
                               </div>
                               <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                                <span className="text-xs text-slate-500">
+                                <span className="text-xs text-muted-foreground">
                                   {formatAmericanOdds(r.decimal_odds)} · {formatOwgr(r.owgr_rank)}
                                 </span>
                                 <OwnershipBadge pickCount={r.pickCount} lineupCount={r.lineupCount} />
@@ -832,10 +835,10 @@ function LineupViewerPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-3 text-right font-mono text-slate-600">
+                        <td className="px-3 py-3 text-right font-mono text-muted-foreground">
                           {formatPos(r.position, r.status)}
                         </td>
-                        <td className="px-3 py-3 text-right font-mono text-slate-600">
+                        <td className="px-3 py-3 text-right font-mono text-muted-foreground">
                           {formatToPar(r.total_to_par)}
                         </td>
                         <td className="px-3 py-3 text-right">
@@ -862,7 +865,7 @@ function LineupViewerPage() {
                         <td className="px-3 py-3 text-right">
                           <StatPts pts={bd.moneyHolePoints} />
                         </td>
-                        <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-700">
+                        <td className="px-4 py-3 text-right font-mono font-semibold text-success">
                           {pts.toFixed(1)}
                         </td>
                       </tr>
@@ -870,21 +873,21 @@ function LineupViewerPage() {
                   })}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t bg-slate-50">
+                  <tr className="border-t bg-muted/50">
                     <td
                       colSpan={11}
-                      className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500"
+                      className="px-4 py-3 text-right text-xs font-semibold uppercase text-muted-foreground"
                     >
                       Total
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-lg font-bold text-emerald-700">
+                    <td className="px-4 py-3 text-right font-mono text-lg font-bold text-success">
                       {lineupTotal.toFixed(1)}
                     </td>
                   </tr>
                 </tfoot>
               </table>
             </div>
-            <p className="border-t px-4 py-3 text-xs text-slate-500">
+            <p className="border-t px-4 py-3 text-xs text-muted-foreground">
               Each column shows count (when applicable) and points earned. DK Classic: Eagle +8 ·
               Birdie +3 · Par +0.5 · Bogey −0.5 · Double+ −1 · Place live (1st +30 … 50th +1). Money
               is the extra from the {MONEY_HOLE_MULTIPLIER}× money hole. Tap Bonus for streak /
@@ -907,10 +910,10 @@ function MobileStat({
   pts: number;
 }) {
   return (
-    <div className="rounded-md border border-slate-100 px-2 py-1.5 text-center">
-      <div className="text-[10px] uppercase tracking-wide text-slate-400">{label}</div>
-      {count != null ? <div className="font-mono text-slate-800">{count}</div> : null}
-      <div className={`font-mono text-[11px] ${pts < 0 ? "text-red-600" : "text-emerald-700"}`}>
+    <div className="rounded-md border border-border px-2 py-1.5 text-center">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      {count != null ? <div className="font-mono text-foreground">{count}</div> : null}
+      <div className={`font-mono text-[11px] ${pts < 0 ? "text-destructive" : "text-success"}`}>
         {formatPts(pts)}
       </div>
     </div>
@@ -935,19 +938,19 @@ function MobileBonusStat({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="w-full rounded-md border border-slate-100 px-2 py-1.5 text-center outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+          className="w-full rounded-md border border-border px-2 py-1.5 text-center outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Bonus points breakdown"
         >
-          <div className="text-[10px] uppercase tracking-wide text-slate-400 underline decoration-dotted underline-offset-2">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground underline decoration-dotted underline-offset-2">
             Bonus
           </div>
-          <div className={`font-mono text-[11px] ${pts < 0 ? "text-red-600" : "text-emerald-700"}`}>
+          <div className={`font-mono text-[11px] ${pts < 0 ? "text-destructive" : "text-success"}`}>
             {formatPts(pts)}
           </div>
         </button>
       </PopoverTrigger>
       <PopoverContent align="center" className="w-56 p-3">
-        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           Bonus breakdown
         </div>
         <BonusBreakdownBody pts={pts} breakdown={breakdown} />

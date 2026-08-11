@@ -23,8 +23,8 @@ export function GolferName({ name, className, showRealNameHint = false }: Golfer
 
   return (
     <span className={cn("flex min-w-0 flex-col", className)}>
-      <span className="truncate font-medium text-slate-900">{display}</span>
-      <span className="truncate text-[11px] text-slate-400">{name}</span>
+      <span className="truncate font-medium text-foreground">{display}</span>
+      <span className="truncate text-[11px] text-muted-foreground">{name}</span>
     </span>
   );
 }

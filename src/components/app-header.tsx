@@ -42,11 +42,11 @@ export function AppHeader() {
           to="/"
           className="group flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/25 transition group-hover:brightness-110">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground transition group-hover:brightness-110">
             <Flag className="h-[18px] w-[18px]" />
           </span>
           <span className="flex min-w-0 flex-col leading-none">
-            <span className="truncate text-base font-bold tracking-tight text-foreground">
+            <span className="truncate font-display text-base font-bold tracking-tight text-foreground">
               WinSeeking
             </span>
             <span className="hidden text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:block">

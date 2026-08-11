@@ -55,13 +55,13 @@ function AuthPage() {
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-brand-muted via-background to-muted px-4 pb-safe pt-safe">
-      <Card className="w-full max-w-md gap-0 p-8 shadow-lg shadow-primary/5">
+    <div className="flex min-h-dvh items-center justify-center bg-background px-4 pb-safe pt-safe">
+      <Card className="w-full max-w-md gap-0 border-border/80 p-8 shadow-sm">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/30">
+          <div className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-primary text-primary-foreground">
             <Flag className="h-7 w-7" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">WinSeeking</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight">WinSeeking</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Fantasy golf salary cap pools with your crew.
           </p>

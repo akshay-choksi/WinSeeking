@@ -398,7 +398,7 @@ function DraftPage() {
           <ArrowLeft className="h-4 w-4" /> Back to league
         </Link>
         <div className="rounded-lg border bg-card p-8 text-center">
-          <Lock className="mx-auto mb-3 h-10 w-10 text-amber-600" />
+          <Lock className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
           <h2 className="text-lg font-bold">Lineups are locked</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             {tournament.name} locked
@@ -426,17 +426,18 @@ function DraftPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-0 pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]">
-      <div className="rounded-t-lg bg-slate-900 px-4 py-4 text-white">
+      <div className="rounded-t-lg bg-navy px-4 py-4 text-navy-foreground">
         <Link
           to="/league/$id"
           params={{ id: leagueId }}
-          className="mb-2 inline-flex min-h-10 items-center gap-1 text-xs text-slate-300 hover:text-white"
+          className="mb-2 inline-flex min-h-10 items-center gap-1 text-xs text-navy-foreground/70 hover:text-navy-foreground"
         >
           <ArrowLeft className="h-3.5 w-3.5" /> League
         </Link>
-        <h1 className="text-xl font-bold tracking-tight">Create Lineup</h1>
-        <p className="mt-1 text-sm text-slate-300">{tournament.name}</p>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+        <p className="text-xs font-semibold uppercase tracking-wider text-success">Draft</p>
+        <h1 className="mt-1 text-xl font-bold tracking-tight">Create Lineup</h1>
+        <p className="mt-1 text-sm text-navy-foreground/75">{tournament.name}</p>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-navy-foreground/55">
           <span>Cap ${salaryCap.toLocaleString()}</span>
           <span>{rosterSize} golfers</span>
           {tournament.lineup_lock_at && (
@@ -447,7 +448,7 @@ function DraftPage() {
           <Button
             variant="outline"
             size="sm"
-            className="h-10 border-slate-600 bg-transparent px-4 text-white hover:bg-slate-800 hover:text-white"
+            className="h-10 border-white/25 bg-transparent px-4 text-navy-foreground hover:bg-white/10 hover:text-navy-foreground"
             onClick={clear}
             disabled={roster.length === 0}
           >
@@ -455,7 +456,7 @@ function DraftPage() {
           </Button>
           <Button
             size="sm"
-            className="h-10 bg-emerald-600 px-4 text-white hover:bg-emerald-500 disabled:opacity-40"
+            className="h-10 bg-primary px-4 text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
             onClick={submit}
             disabled={!canSubmit}
           >
@@ -464,8 +465,8 @@ function DraftPage() {
         </div>
       </div>
 
-      <div className="border-x border-b bg-white">
-        <div className="border-b bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <div className="border-x border-b bg-card">
+        <div className="border-b bg-muted/50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           My Lineup
         </div>
         {Array.from({ length: rosterSize }).map((_, i) => {
@@ -475,20 +476,20 @@ function DraftPage() {
               <GolferAvatar name={g.name} pgaPlayerNum={g.pga_player_num} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">
-                  <GolferName name={g.name} className="truncate font-semibold text-slate-900" />
+                  <GolferName name={g.name} className="truncate font-semibold text-foreground" />
                   <GolferInfoButton golfer={g} />
                 </div>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-muted-foreground">
                   {formatAmericanOdds(g.decimal_odds)} · {formatOwgr(g.owgr_rank)}
                 </div>
               </div>
-              <div className="text-right font-mono text-base font-bold text-slate-900">
+              <div className="text-right font-mono text-base font-bold text-foreground">
                 ${g.salary.toLocaleString()}
               </div>
               <button
                 type="button"
                 onClick={() => drop(g.id)}
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground hover:bg-secondary hover:text-foreground"
                 aria-label={`Remove ${formatGolferDisplayName(g.name, streetNames)}`}
               >
                 <X className="h-4 w-4" />
@@ -497,9 +498,9 @@ function DraftPage() {
           ) : (
             <div
               key={`empty-${i}`}
-              className="flex items-center gap-3 border-b px-4 py-3 text-sm text-slate-400 last:border-b-0"
+              className="flex items-center gap-3 border-b px-4 py-3 text-sm text-muted-foreground last:border-b-0"
             >
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded border border-dashed border-slate-300 text-xs font-bold">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded border border-dashed border-border text-xs font-bold">
                 G
               </span>
               Select a golfer
@@ -508,10 +509,10 @@ function DraftPage() {
         })}
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-lg border bg-white">
+      <div className="mt-4 overflow-hidden rounded-lg border bg-card shadow-sm">
         <div className="space-y-3 border-b p-3">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -525,7 +526,7 @@ function DraftPage() {
         </div>
         <div className="max-h-[min(50dvh,28rem)] overflow-y-auto overflow-x-auto">
           <table className="w-full min-w-[20rem] text-sm">
-            <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase text-slate-500">
+            <thead className="sticky top-0 bg-muted/50 text-left text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 sm:px-4">Golfer</th>
                 <th className="hidden px-3 py-2 text-right sm:table-cell sm:px-4">Odds</th>
@@ -536,7 +537,7 @@ function DraftPage() {
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
                     No golfers available. Ask an admin to sync tournament odds.
                   </td>
                 </tr>
@@ -548,17 +549,17 @@ function DraftPage() {
                 return (
                   <tr
                     key={g.id}
-                    className={`border-t hover:bg-slate-50 ${overBudget ? "opacity-50" : ""}`}
+                    className={`border-t hover:bg-muted/40 ${overBudget ? "opacity-50" : ""}`}
                   >
                     <td className="px-3 py-2.5 sm:px-4">
                       <div className="flex items-center gap-3">
                         <GolferAvatar name={g.name} pgaPlayerNum={g.pga_player_num} />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1">
-                            <GolferName name={g.name} className="truncate font-medium text-slate-900" />
+                            <GolferName name={g.name} className="truncate font-medium text-foreground" />
                             <GolferInfoButton golfer={g} />
                           </div>
-                          <div className="text-xs text-slate-500">
+                          <div className="text-xs text-muted-foreground">
                             <span className="sm:hidden">
                               {formatAmericanOdds(g.decimal_odds)} ·{" "}
                             </span>
@@ -567,16 +568,16 @@ function DraftPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="hidden px-3 py-2.5 text-right font-mono text-slate-500 sm:table-cell sm:px-4">
+                    <td className="hidden px-3 py-2.5 text-right font-mono text-muted-foreground sm:table-cell sm:px-4">
                       {formatAmericanOdds(g.decimal_odds)}
                     </td>
-                    <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-900 sm:px-4">
+                    <td className="px-3 py-2.5 text-right font-mono font-semibold text-foreground sm:px-4">
                       ${g.salary.toLocaleString()}
                     </td>
                     <td className="px-2 py-2.5 sm:px-4">
                       <Button
                         size="icon"
-                        className="h-11 w-11 bg-emerald-600 hover:bg-emerald-700"
+                        className="h-11 w-11"
                         onClick={() => draft(g)}
                         disabled={!canAdd}
                         aria-label={`Add ${formatGolferDisplayName(g.name, streetNames)}`}
@@ -601,25 +602,29 @@ function DraftPage() {
 
       <div
         data-draft-footer
-        className="fixed inset-x-0 bottom-0 z-[60] border-t border-slate-700 bg-slate-900 text-white pb-safe"
+        className="fixed inset-x-0 bottom-0 z-[60] border-t border-white/10 bg-navy text-navy-foreground pb-safe"
       >
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
           <div className="flex min-w-0 flex-1 flex-wrap gap-x-5 gap-y-2">
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-slate-400">Filled</div>
-              <div className={`text-lg font-bold ${validGreen ? "text-emerald-400" : "text-white"}`}>
+              <div className="text-[10px] uppercase tracking-wide text-navy-foreground/55">Filled</div>
+              <div
+                className={`text-lg font-bold tabular-nums ${validGreen ? "text-success" : "text-navy-foreground"}`}
+              >
                 {roster.length}/{rosterSize}
               </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-slate-400">Rem Salary</div>
+              <div className="text-[10px] uppercase tracking-wide text-navy-foreground/55">
+                Rem Salary
+              </div>
               <div
                 className={`font-mono text-lg font-bold ${
                   overCap
-                    ? "text-red-400"
+                    ? "text-destructive"
                     : remaining === 0 && complete
-                      ? "text-emerald-400"
-                      : "text-white"
+                      ? "text-success"
+                      : "text-navy-foreground"
                 }`}
               >
                 {overCap
@@ -628,10 +633,10 @@ function DraftPage() {
               </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-slate-400">Avg Rem</div>
+              <div className="text-[10px] uppercase tracking-wide text-navy-foreground/55">Avg Rem</div>
               <div
                 className={`font-mono text-lg font-bold ${
-                  complete && remaining === 0 ? "text-emerald-400" : "text-white"
+                  complete && remaining === 0 ? "text-success" : "text-navy-foreground"
                 }`}
               >
                 ${avgRem.toLocaleString()}
@@ -639,7 +644,7 @@ function DraftPage() {
             </div>
           </div>
           <Button
-            className="h-11 min-w-[7.5rem] flex-none bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40"
+            className="h-11 min-w-[7.5rem] flex-none disabled:opacity-40"
             onClick={submit}
             disabled={!canSubmit}
           >

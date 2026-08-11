@@ -21,7 +21,7 @@ export function StatusBadge({ children, tone = "default", className }: StatusBad
     <Badge
       variant="outline"
       className={cn(
-        "rounded-full px-2.5 py-0.5 font-medium shadow-none",
+        "rounded-md px-2.5 py-0.5 font-medium shadow-none",
         toneClass[tone],
         className,
       )}

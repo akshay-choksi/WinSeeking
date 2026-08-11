@@ -5,8 +5,10 @@ import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, ShieldAlert, Shield, Flag, Trophy } from "lucide-react";
+import { Loader2, RefreshCw, ShieldAlert, Flag, Trophy } from "lucide-react";
 import type { Tournament } from "@/lib/scoring";
+import { PageHeader } from "@/components/page-header";
+import { SurfacePanel } from "@/components/surface-panel";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPage,
@@ -149,13 +151,13 @@ function AdminPage() {
   if (accessError) {
     return (
       <Card className="mx-auto max-w-md p-8 text-center">
-        <ShieldAlert className="mx-auto mb-3 h-10 w-10 text-red-600" />
+        <ShieldAlert className="mx-auto mb-3 h-10 w-10 text-destructive" />
         <h1 className="text-xl font-bold">Unable to verify admin access</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Your account may be admin, but the profile check failed. Try again in a moment.
         </p>
         {accessError && (
-          <p className="mt-2 break-words font-mono text-xs text-red-600">{accessError}</p>
+          <p className="mt-2 break-words font-mono text-xs text-destructive">{accessError}</p>
         )}
         <Button
           className="mt-4"
@@ -171,7 +173,7 @@ function AdminPage() {
   if (!isAdmin) {
     return (
       <Card className="mx-auto max-w-md p-8 text-center">
-        <ShieldAlert className="mx-auto mb-3 h-10 w-10 text-red-600" />
+        <ShieldAlert className="mx-auto mb-3 h-10 w-10 text-destructive" />
         <h1 className="text-xl font-bold">Admins only</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           You don't have access to the admin dashboard.
@@ -187,25 +189,20 @@ function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Shield className="h-6 w-6 text-emerald-600" />
-        <div>
-          <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage tournament data, odds pricing, and season finals.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Admin"
+        title="Dashboard"
+        description="Manage tournament data, odds pricing, and season finals."
+      />
 
-      <Card className="p-6">
-        <h2 className="font-semibold">Tournament Odds</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <SurfacePanel title="Tournament Odds" bodyClassName="space-y-4 p-5">
+        <p className="text-sm text-muted-foreground">
           Pull schedule, field, and outright odds from DataGolf. Prices the{" "}
           <span className="font-medium text-foreground">current</span> PGA field only (whatever
           DataGolf has live — usually this week&apos;s event). Upcoming events stay scheduled until
           their field goes live.
         </p>
-        <Button onClick={syncOdds} disabled={syncingOdds} className="mt-4">
+        <Button onClick={syncOdds} disabled={syncingOdds}>
           {syncingOdds ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Syncing…
@@ -216,16 +213,13 @@ function AdminPage() {
             </>
           )}
         </Button>
-      </Card>
+      </SurfacePanel>
 
-      <Card className="space-y-4 p-6">
-        <div>
-          <h2 className="font-semibold">Live Results & Finalize</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Sync live scores into fantasy points. When DataGolf marks the event final, sync
-            auto-finalizes season points (wins / top‑5s). You can still Finalize Event manually.
-          </p>
-        </div>
+      <SurfacePanel title="Live Results & Finalize" bodyClassName="space-y-4 p-5">
+        <p className="text-sm text-muted-foreground">
+          Sync live scores into fantasy points. When DataGolf marks the event final, sync
+          auto-finalizes season points (wins / top‑5s). You can still Finalize Event manually.
+        </p>
 
         <div className="overflow-x-auto rounded-lg border">
           <table className="w-full min-w-[28rem] text-sm">
@@ -250,7 +244,7 @@ function AdminPage() {
               {tournaments.map((t) => (
                 <tr
                   key={t.id}
-                  className={`cursor-pointer border-t hover:bg-muted/30 ${selectedId === t.id ? "bg-emerald-50" : ""}`}
+                  className={`cursor-pointer border-t hover:bg-muted/30 ${selectedId === t.id ? "bg-brand-muted/60" : ""}`}
                   onClick={() => setSelectedId(t.id)}
                 >
                   <td className="px-3 py-2">
@@ -316,7 +310,7 @@ function AdminPage() {
             )}
           </Button>
         </div>
-      </Card>
+      </SurfacePanel>
     </div>
   );
 }

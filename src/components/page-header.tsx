@@ -16,7 +16,7 @@ export function PageHeader({ eyebrow, title, description, actions, className }: 
         {eyebrow ? (
           <p className="text-xs font-semibold uppercase tracking-wider text-primary">{eyebrow}</p>
         ) : null}
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">{title}</h1>
+        <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">{title}</h1>
         {description ? (
           <div className="max-w-2xl text-sm text-muted-foreground">{description}</div>
         ) : null}

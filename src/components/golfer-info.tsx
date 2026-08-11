@@ -60,8 +60,8 @@ function formatStat(n: number | null | undefined): string {
 function MetaLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-3 text-xs">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-medium text-slate-800">{value}</span>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium text-foreground">{value}</span>
     </div>
   );
 }
@@ -235,7 +235,7 @@ export function GolferInfoButton({ golfer, className }: Props) {
           ref={triggerRef}
           type="button"
           className={cn(
-            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700",
+            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground/90",
             className,
           )}
           aria-label={`Info about ${displayName}`}
@@ -257,11 +257,11 @@ export function GolferInfoButton({ golfer, className }: Props) {
         <div className="flex items-start gap-3">
           <GolferAvatar name={info.name} pgaPlayerNum={info.pga_player_num} />
           <div className="min-w-0 flex-1">
-            <div className="font-semibold text-slate-900">{displayName}</div>
+            <div className="font-semibold text-foreground">{displayName}</div>
             {streetNames && street && street !== info.name ? (
-              <div className="text-xs text-slate-400">{info.name}</div>
+              <div className="text-xs text-muted-foreground">{info.name}</div>
             ) : null}
-            <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-slate-500">
+            <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
               {info.country ? <span>{info.country}</span> : null}
               {info.is_amateur ? <span>Amateur</span> : null}
               <span>OWGR {formatOwgr(info.owgr_rank)}</span>
@@ -271,8 +271,8 @@ export function GolferInfoButton({ golfer, className }: Props) {
           </div>
         </div>
 
-        <div className="space-y-1.5 rounded-md bg-slate-50 px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+        <div className="space-y-1.5 rounded-md bg-muted/50 px-3 py-2">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             This event
           </div>
           {info.salary != null ? (
@@ -282,15 +282,15 @@ export function GolferInfoButton({ golfer, className }: Props) {
           <MetaLine label="DG model win %" value={formatPct(info.model_win_prob)} />
           <MetaLine label="DG model make-cut %" value={formatPct(info.model_make_cut_prob)} />
           <MetaLine label="DG model top-5 %" value={formatPct(info.model_top5_prob)} />
-          <p className="pt-1 text-[10px] leading-snug text-slate-400">
+          <p className="pt-1 text-[10px] leading-snug text-muted-foreground">
             Book odds are sportsbook prices. DG model % are DataGolf forecast probabilities for this
             tournament (not the same as betting odds).
           </p>
         </div>
 
         {hasSeasonForm ? (
-          <div className="space-y-1.5 rounded-md bg-slate-50 px-3 py-2">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+          <div className="space-y-1.5 rounded-md bg-muted/50 px-3 py-2">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               {new Date().getUTCFullYear()} PGA season
             </div>
             <MetaLine label="Starts" value={formatStat(info.season_events)} />
@@ -305,29 +305,29 @@ export function GolferInfoButton({ golfer, className }: Props) {
         ) : null}
 
         {espnBits.length > 0 ? (
-          <p className="text-xs text-slate-600">{espnBits.join(" · ")}</p>
+          <p className="text-xs text-muted-foreground">{espnBits.join(" · ")}</p>
         ) : null}
 
         <div className="space-y-1.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             Biography
           </div>
           {loading ? (
-            <div className="flex items-center gap-2 text-xs text-slate-500">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Looking up Wikipedia…
             </div>
           ) : info.bio_extract ? (
-            <p className="text-sm leading-snug text-slate-700">{info.bio_extract}</p>
+            <p className="text-sm leading-snug text-foreground/90">{info.bio_extract}</p>
           ) : (
-            <p className="text-sm text-slate-500">No biography available.</p>
+            <p className="text-sm text-muted-foreground">No biography available.</p>
           )}
           {info.bio_url ? (
             <a
               href={info.bio_url}
               target="_blank"
               rel="noreferrer"
-              className="inline-block text-xs font-medium text-emerald-700 hover:underline"
+              className="inline-block text-xs font-medium text-primary hover:underline"
             >
               Wikipedia
             </a>

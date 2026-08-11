@@ -78,7 +78,7 @@ export function EventHighlightsCarousel({
       ? "Fantasy Points Leaders"
       : "Fantasy Points Leaders";
   const icon = harryIsActive ? (
-    <span className="font-mono text-sm font-bold text-amber-600">×3</span>
+    <span className="font-mono text-sm font-bold text-primary">×3</span>
   ) : (
     <Flame className="h-5 w-5" />
   );

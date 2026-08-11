@@ -112,10 +112,10 @@ function DashboardPage() {
           {leagues.map((league) => (
             <Card
               key={league.id}
-              className="group cursor-pointer gap-0 overflow-hidden border-border/80 p-0 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+              className="group cursor-pointer gap-0 overflow-hidden border-border/80 p-0 shadow-sm transition hover:border-primary/35"
               onClick={() => router.navigate({ to: "/league/$id", params: { id: league.id } })}
             >
-              <div className="h-1.5 bg-gradient-to-r from-primary to-navy" />
+              <div className="h-1 bg-primary" />
               <div className="p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -126,7 +126,7 @@ function DashboardPage() {
                       Invite {league.invite_code}
                     </p>
                   </div>
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-muted text-primary">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-muted text-primary">
                     <Users className="h-4 w-4" />
                   </span>
                 </div>
