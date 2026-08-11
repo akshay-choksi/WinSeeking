@@ -17,12 +17,17 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import {
-  isLineupLocked,
   pickActiveTournament,
   formatEventSeasonPtsLabel,
   currentMoneyHoleRound,
   type Tournament,
 } from "@/lib/scoring";
+import {
+  computeMemberLineupStatus,
+  formatLockCountdown,
+  mergeEventStandingsWithMissingMembers,
+  type EventStandingWithDnq,
+} from "@/lib/lineup-status";
 import { pickDayLeaderQuote } from "@/lib/day-leader-quotes";
 import { pickDayCellarQuote } from "@/lib/day-cellar-quotes";
 import { initialsFromName } from "@/lib/profile";
@@ -49,16 +54,7 @@ type MoneyHoleRow = {
   hole_number: number;
 };
 
-type EventStanding = {
-  user_id: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  total_spent: number;
-  total_points: number;
-  golfer_count: number;
-  league_finish: number | null;
-  season_points: number;
-};
+type EventStanding = EventStandingWithDnq;
 
 type SeasonStanding = {
   user_id: string;
@@ -133,6 +129,10 @@ function LeaguePage() {
   const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
   const [showDayLeaderBanner, setShowDayLeaderBanner] = useState(false);
   const [moneyHoles, setMoneyHoles] = useState<MoneyHoleRow[]>([]);
+  const [memberProfiles, setMemberProfiles] = useState<
+    { user_id: string; full_name: string | null; avatar_url: string | null }[]
+  >([]);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const seasonYear = useMemo(() => new Date().getFullYear(), []);
 
   async function loadLeague() {
@@ -170,16 +170,23 @@ function LeaguePage() {
   }
 
   async function loadEventStandings(tournamentId: string) {
-    const { data: lineups } = await supabase
-      .from("lineups")
-      .select("id, user_id, total_spent, total_points, league_finish, season_points")
-      .eq("league_id", id)
-      .eq("tournament_id", tournamentId);
+    const [{ data: lineups }, { data: members }] = await Promise.all([
+      supabase
+        .from("lineups")
+        .select("id, user_id, total_spent, total_points, league_finish, season_points")
+        .eq("league_id", id)
+        .eq("tournament_id", tournamentId),
+      supabase.from("league_members").select("user_id").eq("league_id", id),
+    ]);
+
+    const memberIds = (members ?? []).map((m) => m.user_id as string);
     if (!lineups) {
       setEventStandings([]);
+      setMemberProfiles([]);
       return;
     }
-    const userIds = lineups.map((l) => l.user_id);
+    const lineupUserIds = lineups.map((l) => l.user_id);
+    const userIds = [...new Set([...lineupUserIds, ...memberIds])];
     const lineupIds = lineups.map((l) => l.id);
 
     const [{ data: profiles }, { data: entries }] = await Promise.all([
@@ -196,6 +203,14 @@ function LeaguePage() {
     const profileById = new Map(
       (profiles ?? []).map((p) => [p.id, { full_name: p.full_name, avatar_url: p.avatar_url }]),
     );
+    setMemberProfiles(
+      memberIds.map((uid) => ({
+        user_id: uid,
+        full_name: profileById.get(uid)?.full_name ?? "Player",
+        avatar_url: profileById.get(uid)?.avatar_url ?? null,
+      })),
+    );
+
     const countByLineup = new Map<string, number>();
     (entries ?? []).forEach((e) => {
       countByLineup.set(e.lineup_id, (countByLineup.get(e.lineup_id) ?? 0) + 1);
@@ -211,8 +226,12 @@ function LeaguePage() {
         golfer_count: countByLineup.get(l.id) ?? 0,
         league_finish: l.league_finish ?? null,
         season_points: Number(l.season_points ?? 0),
+        noLineup: (countByLineup.get(l.id) ?? 0) === 0,
       }))
       .sort((a, b) => {
+        const aHas = a.golfer_count > 0 ? 1 : 0;
+        const bHas = b.golfer_count > 0 ? 1 : 0;
+        if (aHas !== bHas) return bHas - aHas;
         if (a.league_finish != null && b.league_finish != null) {
           return a.league_finish - b.league_finish || b.total_points - a.total_points;
         }
@@ -404,30 +423,73 @@ function LeaguePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, selectedTournamentId, user?.id]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const selectedTournament = tournaments.find((t) => t.id === selectedTournamentId) ?? null;
   const rosterSize = league?.max_players ?? 6;
-  const locked = selectedTournament ? isLineupLocked(selectedTournament) : false;
-  const leaderPts = eventStandings[0]?.total_points;
-  const yourStanding = eventStandings.find((s) => s.user_id === user?.id);
+  const locked = selectedTournament
+    ? selectedTournament.status === "completed" ||
+      (!!selectedTournament.lineup_lock_at &&
+        nowMs >= new Date(selectedTournament.lineup_lock_at).getTime())
+    : false;
+  const lineupStatus = useMemo(
+    () =>
+      computeMemberLineupStatus(
+        memberProfiles.map((m) => m.user_id),
+        eventStandings.map((s) => s.user_id),
+        user?.id,
+      ),
+    [memberProfiles, eventStandings, user?.id],
+  );
+  const displayStandings = useMemo(
+    () =>
+      mergeEventStandingsWithMissingMembers(
+        eventStandings,
+        lineupStatus.missingUserIds.map((uid) => {
+          const p = memberProfiles.find((m) => m.user_id === uid);
+          return {
+            user_id: uid,
+            full_name: p?.full_name ?? "Player",
+            avatar_url: p?.avatar_url ?? null,
+          };
+        }),
+        locked,
+      ),
+    [eventStandings, lineupStatus.missingUserIds, memberProfiles, locked],
+  );
+  const leaderPts = displayStandings.find((s) => !s.noLineup)?.total_points ?? displayStandings[0]?.total_points;
+  const yourStanding = displayStandings.find((s) => s.user_id === user?.id);
   const yourEventRank = yourStanding
-    ? eventStandings.findIndex((s) => s.user_id === user?.id) + 1
+    ? displayStandings.findIndex((s) => s.user_id === user?.id) + 1
     : null;
+  const lockCountdown = formatLockCountdown(selectedTournament?.lineup_lock_at, nowMs);
+  const showLockReminder =
+    !!selectedTournament &&
+    !locked &&
+    !!user &&
+    !lineupStatus.currentUserHasLineup &&
+    selectedTournament.status !== "completed";
   const dayLeaderRound = selectedTournament?.last_completed_round ?? null;
-  const dayLeader = eventStandings[0] ?? null;
+  const dayLeader = displayStandings.find((s) => !s.noLineup) ?? displayStandings[0] ?? null;
   const dayLeaderTied =
     !!dayLeader &&
-    eventStandings.length > 1 &&
-    eventStandings[1]!.total_points === dayLeader.total_points;
+    !dayLeader.noLineup &&
+    displayStandings.filter((s) => !s.noLineup).length > 1 &&
+    displayStandings.filter((s) => !s.noLineup)[1]!.total_points === dayLeader.total_points;
   const dayLeaderQuote =
     dayLeaderRound != null && dayLeaderRound >= 1 && selectedTournament
       ? pickDayLeaderQuote(id, selectedTournament.id, dayLeaderRound)
       : null;
+  const scoredStandings = displayStandings.filter((s) => !s.noLineup);
   const dayCellar =
-    eventStandings.length > 1 ? (eventStandings.at(-1) ?? null) : null;
+    scoredStandings.length > 1 ? (scoredStandings.at(-1) ?? null) : null;
   const dayCellarTied =
     !!dayCellar &&
-    eventStandings.length > 2 &&
-    eventStandings.at(-2)!.total_points === dayCellar.total_points;
+    scoredStandings.length > 2 &&
+    scoredStandings.at(-2)!.total_points === dayCellar.total_points;
   const dayCellarName = dayCellar?.full_name?.trim() || "Player";
   const dayCellarQuote =
     dayCellar &&
@@ -557,12 +619,50 @@ function LeaguePage() {
                 {selectedTournament?.lineup_lock_at && (
                   <StatusBadge tone={locked ? "locked" : "live"}>
                     {locked ? "Locked" : "Open"} ·{" "}
-                    {new Date(selectedTournament.lineup_lock_at).toLocaleString()}
+                    {lockCountdown && !locked
+                      ? `Locks in ${lockCountdown}`
+                      : new Date(selectedTournament.lineup_lock_at).toLocaleString()}
                   </StatusBadge>
                 )}
+                {!locked && lineupStatus.missingCount > 0 ? (
+                  <StatusBadge tone="muted">
+                    {lineupStatus.missingCount} still open
+                  </StatusBadge>
+                ) : null}
               </div>
             }
           />
+
+          {showLockReminder ? (
+            <div className="overflow-hidden rounded-xl border border-primary/25 bg-brand-muted/50 shadow-sm">
+              <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                    Lineup reminder
+                  </p>
+                  <p className="mt-1 text-base font-semibold tracking-tight text-foreground">
+                    {lockCountdown
+                      ? `Set your lineup — locks in ${lockCountdown}`
+                      : "Set your lineup before lock"}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {lineupStatus.missingCount > 1
+                      ? `${lineupStatus.missingCount} members still need a lineup (names hidden until lock).`
+                      : "You still need a full salary-cap lineup for this event."}
+                  </p>
+                </div>
+                <Button className="w-full shrink-0 sm:w-auto" asChild>
+                  <Link
+                    to="/league/$id/draft"
+                    params={{ id }}
+                    search={{ tournament: selectedTournamentId ?? undefined }}
+                  >
+                    <Zap className="mr-2 h-4 w-4" /> Set lineup
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          ) : null}
 
           {showDayLeaderBanner && dayLeader && dayLeaderRound != null && dayLeaderQuote && (
             <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -611,7 +711,7 @@ function LeaguePage() {
 
           <SurfacePanel
             title={selectedTournament?.name ?? "Select an event"}
-            meta={`${eventStandings.length} ${eventStandings.length === 1 ? "entry" : "entries"}`}
+            meta={`${displayStandings.length} ${displayStandings.length === 1 ? "entry" : "entries"}`}
           >
             <div className="grid grid-cols-2">
               <div className="bg-navy px-5 py-4 text-navy-foreground">
@@ -619,10 +719,16 @@ function LeaguePage() {
                   Your points
                 </p>
                 <p className="mt-1 text-2xl font-bold tracking-tight tabular-nums">
-                  {yourStanding ? yourStanding.total_points.toFixed(1) : "—"}
+                  {yourStanding && !yourStanding.noLineup
+                    ? yourStanding.total_points.toFixed(1)
+                    : "—"}
                 </p>
                 <p className="mt-1 text-xs text-navy-foreground/65">
-                  {yourEventRank != null ? `#${yourEventRank} this event` : "No lineup submitted"}
+                  {yourStanding && !yourStanding.noLineup && yourEventRank != null
+                    ? `#${yourEventRank} this event`
+                    : yourStanding?.noLineup
+                      ? "No lineup · DNQ"
+                      : "No lineup submitted"}
                 </p>
               </div>
               <div className="border-l border-primary/15 bg-brand-muted/40 px-5 py-4">
@@ -633,13 +739,13 @@ function LeaguePage() {
                   {leaderPts != null ? leaderPts.toFixed(1) : "—"}
                 </p>
                 <p className="mt-1 truncate text-xs text-muted-foreground">
-                  {eventStandings[0]?.full_name ?? "No lineups yet"}
+                  {scoredStandings[0]?.full_name ?? "No lineups yet"}
                 </p>
               </div>
             </div>
             {(!locked || user) && (
               <div className="border-t border-border/80 px-4 py-3">
-                {locked && user ? (
+                {locked && user && !yourStanding?.noLineup ? (
                   <Button className="w-full sm:w-auto" variant="outline" asChild>
                     <Link
                       to="/league/$id/lineup/$userId"
@@ -657,7 +763,7 @@ function LeaguePage() {
                       search={{ tournament: selectedTournamentId ?? undefined }}
                     >
                       <Zap className="mr-2 h-4 w-4" />
-                      {yourStanding ? "Edit lineup" : "Set lineup"}
+                      {lineupStatus.currentUserHasLineup ? "Edit lineup" : "Set lineup"}
                     </Link>
                   </Button>
                 ) : null}
@@ -739,7 +845,7 @@ function LeaguePage() {
                   : "Realtime"
             }
           >
-            {eventStandings.length === 0 ? (
+            {displayStandings.length === 0 ? (
               <div className="p-10 text-center text-sm text-muted-foreground">
                 No lineups submitted for this event yet.
               </div>
@@ -747,8 +853,9 @@ function LeaguePage() {
               <>
                 {/* Mobile stacked rows */}
                 <div className="divide-y md:hidden">
-                  {eventStandings.map((s, i) => {
-                    const canView = locked || s.user_id === user?.id;
+                  {displayStandings.map((s, i) => {
+                    const isDnq = !!s.noLineup;
+                    const canView = !isDnq && (locked || s.user_id === user?.id);
                     const isYou = s.user_id === user?.id;
                     const place = s.league_finish ?? i + 1;
                     const showSeasonPts =
@@ -756,7 +863,7 @@ function LeaguePage() {
                     const row = (
                       <div className="flex items-center gap-3 px-4 py-3">
                         <div className="w-7 shrink-0 text-center font-mono text-sm text-muted-foreground">
-                          {place === 1 ? (
+                          {place === 1 && !isDnq ? (
                             <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
                               1
                             </span>
@@ -771,8 +878,11 @@ function LeaguePage() {
                             isYou={isYou}
                           />
                           <div className="mt-0.5 text-xs text-muted-foreground">
-                            {s.golfer_count}/{rosterSize} · ${s.total_spent.toLocaleString()}
-                            {showSeasonPts ? ` · Season ${s.season_points.toFixed(1)}` : ""}
+                            {isDnq
+                              ? "No lineup · DNQ"
+                              : `${s.golfer_count}/${rosterSize} · $${s.total_spent.toLocaleString()}${
+                                  showSeasonPts ? ` · Season ${s.season_points.toFixed(1)}` : ""
+                                }`}
                           </div>
                         </div>
                         <div className="shrink-0 text-right font-mono text-base font-semibold tabular-nums text-success">
@@ -791,7 +901,9 @@ function LeaguePage() {
                         {row}
                       </Link>
                     ) : (
-                      <div key={s.user_id}>{row}</div>
+                      <div key={s.user_id} className={isDnq ? "bg-muted/20" : undefined}>
+                        {row}
+                      </div>
                     );
                   })}
                 </div>
@@ -810,8 +922,9 @@ function LeaguePage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {eventStandings.map((s, i) => {
-                        const canView = locked || s.user_id === user?.id;
+                      {displayStandings.map((s, i) => {
+                        const isDnq = !!s.noLineup;
+                        const canView = !isDnq && (locked || s.user_id === user?.id);
                         const isYou = s.user_id === user?.id;
                         const place = s.league_finish ?? i + 1;
                         const showSeasonPts =
@@ -819,10 +932,12 @@ function LeaguePage() {
                         return (
                           <tr
                             key={s.user_id}
-                            className="border-t border-border/70 transition hover:bg-brand-muted/30"
+                            className={`border-t border-border/70 transition hover:bg-brand-muted/30${
+                              isDnq ? " bg-muted/20" : ""
+                            }`}
                           >
                             <td className="px-5 py-3 font-mono text-muted-foreground">
-                              {place === 1 ? (
+                              {place === 1 && !isDnq ? (
                                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
                                   1
                                 </span>
@@ -853,10 +968,14 @@ function LeaguePage() {
                               )}
                             </td>
                             <td className="px-5 py-3 tabular-nums">
-                              {s.golfer_count} / {rosterSize}
+                              {isDnq ? (
+                                <span className="text-muted-foreground">No lineup</span>
+                              ) : (
+                                `${s.golfer_count} / ${rosterSize}`
+                              )}
                             </td>
                             <td className="px-5 py-3 text-right font-mono tabular-nums">
-                              ${s.total_spent.toLocaleString()}
+                              {isDnq ? "—" : `$${s.total_spent.toLocaleString()}`}
                             </td>
                             <td className="px-5 py-3 text-right font-mono text-base font-semibold tabular-nums text-success">
                               {s.total_points.toFixed(1)}

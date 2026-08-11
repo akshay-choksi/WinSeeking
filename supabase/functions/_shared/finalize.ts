@@ -56,11 +56,56 @@ export async function finalizeTournament(
   );
   const multiplier = Number(t.fedex_multiplier ?? 1);
 
-  const { data: lineups, error: lineupsError } = await admin
+  // Fill missing members with empty 0-pt DNQ lineups so they rank last, not invisible.
+  const { data: members, error: membersError } = await admin
+    .from("league_members")
+    .select("league_id, user_id");
+  if (membersError) throw new Error(membersError.message);
+
+  let { data: lineups, error: lineupsError } = await admin
     .from("lineups")
     .select("id, league_id, user_id, total_points, league_finish, season_points")
     .eq("tournament_id", t.id);
   if (lineupsError) throw new Error(lineupsError.message);
+
+  const existingKeys = new Set(
+    (lineups ?? []).map((l) => `${l.league_id as string}:${l.user_id as string}`),
+  );
+  const dnqInserts: {
+    league_id: string;
+    user_id: string;
+    tournament_id: string;
+    total_spent: number;
+    total_points: number;
+    season_points: number;
+  }[] = [];
+  for (const m of members ?? []) {
+    const leagueId = m.league_id as string;
+    const userId = m.user_id as string;
+    const key = `${leagueId}:${userId}`;
+    if (existingKeys.has(key)) continue;
+    existingKeys.add(key);
+    dnqInserts.push({
+      league_id: leagueId,
+      user_id: userId,
+      tournament_id: t.id,
+      total_spent: 0,
+      total_points: 0,
+      season_points: 0,
+    });
+  }
+
+  if (dnqInserts.length > 0) {
+    const { error: insertError } = await admin.from("lineups").insert(dnqInserts);
+    if (insertError) throw new Error(insertError.message);
+
+    const refetch = await admin
+      .from("lineups")
+      .select("id, league_id, user_id, total_points, league_finish, season_points")
+      .eq("tournament_id", t.id);
+    if (refetch.error) throw new Error(refetch.error.message);
+    lineups = refetch.data;
+  }
 
   if (!lineups || lineups.length === 0) {
     await admin.from("tournaments").update({ status: "completed" }).eq("id", t.id);
@@ -85,6 +130,19 @@ export async function finalizeTournament(
     };
   }
 
+  const lineupIds = lineups.map((l) => l.id as string);
+  const withEntries = new Set<string>();
+  if (lineupIds.length > 0) {
+    const { data: entryRows, error: entriesError } = await admin
+      .from("lineup_entries")
+      .select("lineup_id")
+      .in("lineup_id", lineupIds);
+    if (entriesError) throw new Error(entriesError.message);
+    for (const e of entryRows ?? []) {
+      withEntries.add(e.lineup_id as string);
+    }
+  }
+
   const byLeague = new Map<string, typeof pending>();
   for (const l of pending) {
     const arr = byLeague.get(l.league_id) ?? [];
@@ -97,20 +155,32 @@ export async function finalizeTournament(
 
   for (const [leagueId, leagueLineups] of byLeague) {
     const allForLeague = lineups.filter((l) => l.league_id === leagueId);
-    const sorted = [...allForLeague].sort(
-      (a, b) => Number(b.total_points) - Number(a.total_points),
-    );
+    // Real lineups (any picks) rank above empty DNQ rows, even at 0 fantasy points.
+    const sorted = [...allForLeague].sort((a, b) => {
+      const aHas = withEntries.has(a.id as string) ? 1 : 0;
+      const bHas = withEntries.has(b.id as string) ? 1 : 0;
+      if (aHas !== bHas) return bHas - aHas;
+      return Number(b.total_points) - Number(a.total_points);
+    });
 
     let finish = 0;
     let lastPoints: number | null = null;
+    let lastHasEntries: number | null = null;
     let index = 0;
     const finishById = new Map<string, number>();
     for (const row of sorted) {
       index += 1;
       const pts = Number(row.total_points);
-      if (lastPoints === null || pts !== lastPoints) {
+      const hasEntries = withEntries.has(row.id as string) ? 1 : 0;
+      // Break ties across the DNQ boundary so empty lineups don't share place with real 0-pt sets.
+      if (
+        lastPoints === null ||
+        pts !== lastPoints ||
+        lastHasEntries !== hasEntries
+      ) {
         finish = index;
         lastPoints = pts;
+        lastHasEntries = hasEntries;
       }
       finishById.set(row.id, finish);
     }
