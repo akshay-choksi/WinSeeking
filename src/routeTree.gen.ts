@@ -18,6 +18,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedLeagueIdRouteImport } from './routes/_authenticated/league.$id'
 import { Route as AuthenticatedLeagueIdSettingsRouteImport } from './routes/_authenticated/league.$id_.settings'
 import { Route as AuthenticatedLeagueIdDraftRouteImport } from './routes/_authenticated/league.$id_.draft'
+import { Route as AuthenticatedLeagueIdRecapTournamentIdRouteImport } from './routes/_authenticated/league.$id_.recap.$tournamentId'
 import { Route as AuthenticatedLeagueIdLineupUserIdRouteImport } from './routes/_authenticated/league.$id_.lineup.$userId'
 
 const HowItWorksRoute = HowItWorksRouteImport.update({
@@ -66,6 +67,12 @@ const AuthenticatedLeagueIdDraftRoute =
     path: '/league/$id/draft',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedLeagueIdRecapTournamentIdRoute =
+  AuthenticatedLeagueIdRecapTournamentIdRouteImport.update({
+    id: '/league/$id_/recap/$tournamentId',
+    path: '/league/$id/recap/$tournamentId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedLeagueIdLineupUserIdRoute =
   AuthenticatedLeagueIdLineupUserIdRouteImport.update({
     id: '/league/$id_/lineup/$userId',
@@ -83,6 +90,7 @@ export interface FileRoutesByFullPath {
   '/league/$id/draft': typeof AuthenticatedLeagueIdDraftRoute
   '/league/$id/settings': typeof AuthenticatedLeagueIdSettingsRoute
   '/league/$id/lineup/$userId': typeof AuthenticatedLeagueIdLineupUserIdRoute
+  '/league/$id/recap/$tournamentId': typeof AuthenticatedLeagueIdRecapTournamentIdRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -94,6 +102,7 @@ export interface FileRoutesByTo {
   '/league/$id/draft': typeof AuthenticatedLeagueIdDraftRoute
   '/league/$id/settings': typeof AuthenticatedLeagueIdSettingsRoute
   '/league/$id/lineup/$userId': typeof AuthenticatedLeagueIdLineupUserIdRoute
+  '/league/$id/recap/$tournamentId': typeof AuthenticatedLeagueIdRecapTournamentIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -107,6 +116,7 @@ export interface FileRoutesById {
   '/_authenticated/league/$id_/draft': typeof AuthenticatedLeagueIdDraftRoute
   '/_authenticated/league/$id_/settings': typeof AuthenticatedLeagueIdSettingsRoute
   '/_authenticated/league/$id_/lineup/$userId': typeof AuthenticatedLeagueIdLineupUserIdRoute
+  '/_authenticated/league/$id_/recap/$tournamentId': typeof AuthenticatedLeagueIdRecapTournamentIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -120,6 +130,7 @@ export interface FileRouteTypes {
     | '/league/$id/draft'
     | '/league/$id/settings'
     | '/league/$id/lineup/$userId'
+    | '/league/$id/recap/$tournamentId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -131,6 +142,7 @@ export interface FileRouteTypes {
     | '/league/$id/draft'
     | '/league/$id/settings'
     | '/league/$id/lineup/$userId'
+    | '/league/$id/recap/$tournamentId'
   id:
     | '__root__'
     | '/_authenticated'
@@ -143,6 +155,7 @@ export interface FileRouteTypes {
     | '/_authenticated/league/$id_/draft'
     | '/_authenticated/league/$id_/settings'
     | '/_authenticated/league/$id_/lineup/$userId'
+    | '/_authenticated/league/$id_/recap/$tournamentId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -216,6 +229,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLeagueIdDraftRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/league/$id_/recap/$tournamentId': {
+      id: '/_authenticated/league/$id_/recap/$tournamentId'
+      path: '/league/$id/recap/$tournamentId'
+      fullPath: '/league/$id/recap/$tournamentId'
+      preLoaderRoute: typeof AuthenticatedLeagueIdRecapTournamentIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/league/$id_/lineup/$userId': {
       id: '/_authenticated/league/$id_/lineup/$userId'
       path: '/league/$id/lineup/$userId'
@@ -234,6 +254,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedLeagueIdDraftRoute: typeof AuthenticatedLeagueIdDraftRoute
   AuthenticatedLeagueIdSettingsRoute: typeof AuthenticatedLeagueIdSettingsRoute
   AuthenticatedLeagueIdLineupUserIdRoute: typeof AuthenticatedLeagueIdLineupUserIdRoute
+  AuthenticatedLeagueIdRecapTournamentIdRoute: typeof AuthenticatedLeagueIdRecapTournamentIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -245,6 +266,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedLeagueIdSettingsRoute: AuthenticatedLeagueIdSettingsRoute,
   AuthenticatedLeagueIdLineupUserIdRoute:
     AuthenticatedLeagueIdLineupUserIdRoute,
+  AuthenticatedLeagueIdRecapTournamentIdRoute:
+    AuthenticatedLeagueIdRecapTournamentIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
