@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ArrowLeft, Lock, RefreshCw } from "lucide-react";
 import { GolferAvatar } from "@/components/golfer-avatar";
 import { GolferInfoButton } from "@/components/golfer-info";
+import { GolferName } from "@/components/golfer-name";
 import { StatusBadge } from "@/components/status-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -718,7 +719,7 @@ function LineupViewerPage() {
                       <GolferAvatar name={r.name} pgaPlayerNum={r.pga_player_num} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1">
-                          <div className="font-medium text-slate-900">{r.name}</div>
+                          <GolferName name={r.name} className="font-medium text-slate-900" />
                           <GolferInfoButton golfer={toGolferInfo(r)} />
                         </div>
                         <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
@@ -819,7 +820,7 @@ function LineupViewerPage() {
                             <GolferAvatar name={r.name} pgaPlayerNum={r.pga_player_num} />
                             <div className="min-w-0">
                               <div className="flex items-center gap-1">
-                                <div className="font-medium text-slate-900">{r.name}</div>
+                                <GolferName name={r.name} className="font-medium text-slate-900" />
                                 <GolferInfoButton golfer={toGolferInfo(r)} />
                               </div>
                               <div className="mt-0.5 flex flex-wrap items-center gap-1.5">

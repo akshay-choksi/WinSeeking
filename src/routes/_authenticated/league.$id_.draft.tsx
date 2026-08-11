@@ -8,6 +8,11 @@ import { toast } from "sonner";
 import { Plus, X, Search, Lock, ArrowLeft, Eye } from "lucide-react";
 import { GolferAvatar } from "@/components/golfer-avatar";
 import { GolferInfoButton } from "@/components/golfer-info";
+import { GolferName } from "@/components/golfer-name";
+import { NicknameDeSargeToggle } from "@/components/nickname-de-sarge-toggle";
+import { useStreetNamesPref } from "@/hooks/use-street-names-pref";
+import { formatGolferDisplayName } from "@/lib/golfer-display-name";
+import { golferMatchesSearch } from "@/lib/sarge-nicknames";
 import {
   formatAmericanOdds,
   isLineupLocked,
@@ -62,6 +67,7 @@ function DraftPage() {
   const { tournament: tournamentQuery } = Route.useSearch();
   const { user } = useAuth();
   const router = useRouter();
+  const [streetNames] = useStreetNamesPref();
 
   const [salaryCap, setSalaryCap] = useState(50000);
   const [rosterSize, setRosterSize] = useState(6);
@@ -298,7 +304,7 @@ function DraftPage() {
     const q = search.toLowerCase().trim();
     return golfers
       .filter((g) => !rosterIds.has(g.id))
-      .filter((g) => (q ? g.name.toLowerCase().includes(q) : true));
+      .filter((g) => golferMatchesSearch(g.name, q));
   }, [golfers, roster, search]);
 
   function draft(g: Golfer) {
@@ -469,7 +475,7 @@ function DraftPage() {
               <GolferAvatar name={g.name} pgaPlayerNum={g.pga_player_num} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">
-                  <div className="truncate font-semibold text-slate-900">{g.name}</div>
+                  <GolferName name={g.name} className="truncate font-semibold text-slate-900" />
                   <GolferInfoButton golfer={g} />
                 </div>
                 <div className="text-xs text-slate-500">
@@ -483,7 +489,7 @@ function DraftPage() {
                 type="button"
                 onClick={() => drop(g.id)}
                 className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300"
-                aria-label={`Remove ${g.name}`}
+                aria-label={`Remove ${formatGolferDisplayName(g.name, streetNames)}`}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -503,16 +509,19 @@ function DraftPage() {
       </div>
 
       <div className="mt-4 overflow-hidden rounded-lg border bg-white">
-        <div className="border-b p-3">
+        <div className="space-y-3 border-b p-3">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search golfers…"
+              placeholder={
+                streetNames ? "Search Nickname de Sarge or golfers…" : "Search golfers…"
+              }
               className="pl-9"
             />
           </div>
+          <NicknameDeSargeToggle id="draft-nickname-de-sarge" />
         </div>
         <div className="max-h-[min(50dvh,28rem)] overflow-y-auto overflow-x-auto">
           <table className="w-full min-w-[20rem] text-sm">
@@ -546,7 +555,7 @@ function DraftPage() {
                         <GolferAvatar name={g.name} pgaPlayerNum={g.pga_player_num} />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1">
-                            <div className="truncate font-medium text-slate-900">{g.name}</div>
+                            <GolferName name={g.name} className="truncate font-medium text-slate-900" />
                             <GolferInfoButton golfer={g} />
                           </div>
                           <div className="text-xs text-slate-500">
@@ -570,13 +579,13 @@ function DraftPage() {
                         className="h-11 w-11 bg-emerald-600 hover:bg-emerald-700"
                         onClick={() => draft(g)}
                         disabled={!canAdd}
-                        aria-label={`Add ${g.name}`}
+                        aria-label={`Add ${formatGolferDisplayName(g.name, streetNames)}`}
                         title={
                           overBudget
                             ? "Over remaining salary"
                             : rosterFull
                               ? "Roster is full"
-                              : `Add ${g.name}`
+                              : `Add ${formatGolferDisplayName(g.name, streetNames)}`
                         }
                       >
                         <Plus className="h-4 w-4" />

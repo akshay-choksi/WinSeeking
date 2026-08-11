@@ -11,6 +11,7 @@ import {
 import { SurfacePanel } from "@/components/surface-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { GolferAvatar } from "@/components/golfer-avatar";
+import { GolferName } from "@/components/golfer-name";
 import { HarrysBigHole, type HarrysBigHoleRound } from "@/components/harrys-big-hole";
 import { cn } from "@/lib/utils";
 
@@ -111,7 +112,9 @@ export function EventHighlightsCarousel({
           </div>
           <GolferAvatar name={g.name} pgaPlayerNum={g.pga_player_num} size="md" />
           <div className="min-w-0 flex-1">
-            <p className="truncate font-medium leading-tight">{g.name}</p>
+            <p className="truncate font-medium leading-tight">
+              <GolferName name={g.name} />
+            </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {formatPos(g.position, g.status)} · {formatToPar(g.total_to_par)}
               {g.onYourLineup ? " · Your pick" : ""}

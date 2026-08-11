@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useProfile } from "@/hooks/use-profile";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
+import { NicknameDeSargeToggle } from "@/components/nickname-de-sarge-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -214,6 +215,8 @@ function ProfilePage() {
           {saving ? "Saving…" : "Save profile"}
         </Button>
       </div>
+
+      <NicknameDeSargeToggle id="profile-nickname-de-sarge" density="comfortable" />
     </div>
   );
 }

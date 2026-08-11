@@ -2,8 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { Info, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { GolferAvatar } from "@/components/golfer-avatar";
+import { GolferName } from "@/components/golfer-name";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatAmericanOdds } from "@/lib/scoring";
+import { formatGolferDisplayName } from "@/lib/golfer-display-name";
+import { getSargePrimaryNickname } from "@/lib/sarge-nicknames";
+import { useStreetNamesPref } from "@/hooks/use-street-names-pref";
 import { cn } from "@/lib/utils";
 
 export type GolferInfoData = {
@@ -79,6 +83,7 @@ type Props = {
 };
 
 export function GolferInfoButton({ golfer, className }: Props) {
+  const [streetNames] = useStreetNamesPref();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState<GolferInfoData>(golfer);
@@ -89,6 +94,8 @@ export function GolferInfoButton({ golfer, className }: Props) {
   const SIDE_OFFSET = 6;
   const FOOTER_GAP = 16;
   const EDGE_MARGIN = 16;
+  const displayName = formatGolferDisplayName(info.name, streetNames);
+  const street = getSargePrimaryNickname(info.name);
 
   function measureLayout() {
     const trigger = triggerRef.current;
@@ -231,7 +238,7 @@ export function GolferInfoButton({ golfer, className }: Props) {
             "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700",
             className,
           )}
-          aria-label={`Info about ${golfer.name}`}
+          aria-label={`Info about ${displayName}`}
           onClick={(e) => e.stopPropagation()}
         >
           <Info className="h-4 w-4" />
@@ -250,7 +257,10 @@ export function GolferInfoButton({ golfer, className }: Props) {
         <div className="flex items-start gap-3">
           <GolferAvatar name={info.name} pgaPlayerNum={info.pga_player_num} />
           <div className="min-w-0 flex-1">
-            <div className="font-semibold text-slate-900">{info.name}</div>
+            <div className="font-semibold text-slate-900">{displayName}</div>
+            {streetNames && street && street !== info.name ? (
+              <div className="text-xs text-slate-400">{info.name}</div>
+            ) : null}
             <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-slate-500">
               {info.country ? <span>{info.country}</span> : null}
               {info.is_amateur ? <span>Amateur</span> : null}
