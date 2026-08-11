@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trophy, ArrowLeft, Zap, Medal, Eye, Copy, X, LogIn, Settings } from "lucide-react";
+import { Trophy, ArrowLeft, Zap, Medal, Eye, Copy, X, LogIn, Settings, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
@@ -888,6 +888,17 @@ function LeaguePage() {
                 {formatEventSeasonPtsLabel(selectedTournament)}
               </StatusBadge>
             )}
+            {selectedTournament?.status === "completed" && selectedTournamentId ? (
+              <Button variant="outline" size="sm" className="ml-auto" asChild>
+                <Link
+                  to="/league/$id/recap/$tournamentId"
+                  params={{ id, tournamentId: selectedTournamentId }}
+                >
+                  <BookOpen className="mr-1.5 h-4 w-4" />
+                  Event Recap
+                </Link>
+              </Button>
+            ) : null}
           </div>
 
           {locked && ownershipRoasts.length > 0 ? (
