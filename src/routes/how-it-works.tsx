@@ -200,7 +200,8 @@ function HowItWorksPage() {
                   {formatPts(moneyHoleBirdie)}
                 </span>{" "}
                 instead of {formatPts(SCORING.birdie)}. Bogeys hurt {MONEY_HOLE_MULTIPLIER}×
-                too. The hole is set per round and shown on the league and lineup boards.
+                too. The hole is set per round and shown on the league and lineup boards —
+                first time it drops for a round, you get a one-shot reveal.
               </p>
             </div>
             <div>
@@ -210,6 +211,15 @@ function HowItWorksPage() {
               <p className="mt-1.5">
                 Optional toggle (profile / draft) that swaps tour names for Sarge nicknames —
                 pure vibes, zero scoring impact.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-display text-base font-semibold text-navy-foreground">
+                Made the weekend
+              </h3>
+              <p className="mt-1.5">
+                After the cut is in play, the event leaderboard shows how many of your golfers made
+                the weekend (X/N on the roster) — tracking only, no scoring change.
               </p>
             </div>
           </div>

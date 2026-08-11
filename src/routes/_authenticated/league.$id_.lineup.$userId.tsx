@@ -27,6 +27,8 @@ import {
 import { initialsFromName } from "@/lib/profile";
 import { computeOwnershipStats, ownershipKind } from "@/lib/ownership";
 import { HarrysBigHole } from "@/components/harrys-big-hole";
+import { HarrysBigHoleReveal } from "@/components/harrys-big-hole-reveal";
+import { useHarrysReveal } from "@/hooks/use-harrys-reveal";
 
 export const Route = createFileRoute("/_authenticated/league/$id_/lineup/$userId")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -240,6 +242,12 @@ function LineupViewerPage() {
 
   const isOwn = Boolean(user?.id && user.id === userId);
   const locked = tournament ? isLineupLocked(tournament) : false;
+  const { open: harrysRevealOpen, onOpenChange: onHarrysRevealOpenChange } = useHarrysReveal({
+    userId: user?.id,
+    tournamentId: tournament?.id,
+    round: moneyHole?.round ?? null,
+    holePresent: moneyHole != null,
+  });
   const { refresh: refreshScores, refreshing } = useLiveScoreRefresh({
     leagueId,
     tournamentId: tournament?.id ?? tournamentQuery ?? null,
@@ -621,6 +629,15 @@ function LineupViewerPage() {
       >
         <ArrowLeft className="h-4 w-4" /> {leagueName}
       </Link>
+
+      {moneyHole ? (
+        <HarrysBigHoleReveal
+          open={harrysRevealOpen}
+          onOpenChange={onHarrysRevealOpenChange}
+          holeNumber={moneyHole.hole}
+          roundNumber={moneyHole.round}
+        />
+      ) : null}
 
       <div className="rounded-lg bg-navy px-5 py-5 text-navy-foreground shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">

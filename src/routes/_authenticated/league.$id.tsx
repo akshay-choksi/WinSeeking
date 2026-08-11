@@ -42,6 +42,8 @@ import { StatusBadge } from "@/components/status-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EventHighlightsCarousel } from "@/components/event-highlights-carousel";
 import { OwnershipRoastChips } from "@/components/ownership-roast-chips";
+import { HarrysBigHoleReveal } from "@/components/harrys-big-hole-reveal";
+import { useHarrysReveal } from "@/hooks/use-harrys-reveal";
 
 export const Route = createFileRoute("/_authenticated/league/$id")({
   component: LeaguePage,
@@ -60,7 +62,10 @@ type MoneyHoleRow = {
   hole_number: number;
 };
 
-type EventStanding = EventStandingWithDnq;
+type EventStanding = EventStandingWithDnq & {
+  /** Count of starters with made_cut === true; 0 when unknown / DNQ. */
+  made_cut_count: number;
+};
 
 type SeasonStanding = {
   user_id: string;
@@ -135,6 +140,8 @@ function LeaguePage() {
   const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
   const [ownershipRoasts, setOwnershipRoasts] = useState<OwnershipRoast[]>([]);
   const [showDayLeaderBanner, setShowDayLeaderBanner] = useState(false);
+  /** True when any lineup pick has non-null made_cut for the selected event. */
+  const [cutStatusKnown, setCutStatusKnown] = useState(false);
   const [moneyHoles, setMoneyHoles] = useState<MoneyHoleRow[]>([]);
   const [memberProfiles, setMemberProfiles] = useState<
     { user_id: string; full_name: string | null; avatar_url: string | null }[]
@@ -190,21 +197,26 @@ function LeaguePage() {
     if (!lineups) {
       setEventStandings([]);
       setMemberProfiles([]);
+      setCutStatusKnown(false);
       return;
     }
     const lineupUserIds = lineups.map((l) => l.user_id);
     const userIds = [...new Set([...lineupUserIds, ...memberIds])];
     const lineupIds = lineups.map((l) => l.id);
 
-    const [{ data: profiles }, { data: entries }] = await Promise.all([
+    const [{ data: profiles }, { data: entries }, { data: results }] = await Promise.all([
       userIds.length
         ? supabase.from("profiles").select("id, full_name, avatar_url").in("id", userIds)
         : Promise.resolve({
             data: [] as { id: string; full_name: string | null; avatar_url: string | null }[],
           }),
       lineupIds.length
-        ? supabase.from("lineup_entries").select("lineup_id").in("lineup_id", lineupIds)
-        : Promise.resolve({ data: [] as { lineup_id: string }[] }),
+        ? supabase.from("lineup_entries").select("lineup_id, golfer_id").in("lineup_id", lineupIds)
+        : Promise.resolve({ data: [] as { lineup_id: string; golfer_id: string }[] }),
+      supabase
+        .from("player_results")
+        .select("golfer_id, made_cut")
+        .eq("tournament_id", tournamentId),
     ]);
 
     const profileById = new Map(
@@ -218,10 +230,24 @@ function LeaguePage() {
       })),
     );
 
+    const madeCutByGolfer = new Map(
+      (results ?? []).map((r) => [r.golfer_id, r.made_cut as boolean | null]),
+    );
     const countByLineup = new Map<string, number>();
+    const madeCutCountByLineup = new Map<string, number>();
+    let anyKnownCut = false;
     (entries ?? []).forEach((e) => {
       countByLineup.set(e.lineup_id, (countByLineup.get(e.lineup_id) ?? 0) + 1);
+      const mc = madeCutByGolfer.get(e.golfer_id);
+      if (mc === true || mc === false) anyKnownCut = true;
+      if (mc === true) {
+        madeCutCountByLineup.set(
+          e.lineup_id,
+          (madeCutCountByLineup.get(e.lineup_id) ?? 0) + 1,
+        );
+      }
     });
+    setCutStatusKnown(anyKnownCut);
 
     const rows: EventStanding[] = lineups
       .map((l) => ({
@@ -231,6 +257,7 @@ function LeaguePage() {
         total_spent: l.total_spent,
         total_points: Number(l.total_points ?? 0),
         golfer_count: countByLineup.get(l.id) ?? 0,
+        made_cut_count: madeCutCountByLineup.get(l.id) ?? 0,
         league_finish: l.league_finish ?? null,
         season_points: Number(l.season_points ?? 0),
         noLineup: (countByLineup.get(l.id) ?? 0) === 0,
@@ -434,6 +461,7 @@ function LeaguePage() {
       setTopScorers([]);
       setMoneyHoles([]);
       setOwnershipRoasts([]);
+      setCutStatusKnown(false);
       return;
     }
     loadEventStandings(selectedTournamentId);
@@ -569,6 +597,15 @@ function LeaguePage() {
     moneyHoleRound != null
       ? (moneyHoles.find((h) => h.round_number === moneyHoleRound) ?? null)
       : null;
+  const { open: harrysRevealOpen, onOpenChange: onHarrysRevealOpenChange } = useHarrysReveal({
+    userId: user?.id,
+    tournamentId: selectedTournament?.id,
+    round: moneyHoleRound,
+    holePresent: todaysMoneyHole != null,
+  });
+
+  const showMadeCutCounts =
+    (selectedTournament?.last_completed_round ?? 0) >= 2 || cutStatusKnown;
 
   useEffect(() => {
     let cancelled = false;
@@ -783,6 +820,15 @@ function LeaguePage() {
             </div>
           )}
 
+          {todaysMoneyHole && moneyHoleRound != null ? (
+            <HarrysBigHoleReveal
+              open={harrysRevealOpen}
+              onOpenChange={onHarrysRevealOpenChange}
+              holeNumber={todaysMoneyHole.hole_number}
+              roundNumber={moneyHoleRound}
+            />
+          ) : null}
+
           <SurfacePanel
             title={selectedTournament?.name ?? "Select an event"}
             meta={`${displayStandings.length} ${displayStandings.length === 1 ? "entry" : "entries"}`}
@@ -954,6 +1000,10 @@ function LeaguePage() {
                     const place = s.league_finish ?? i + 1;
                     const showSeasonPts =
                       selectedTournament?.status === "completed" || s.league_finish != null;
+                    const madeCutLabel =
+                      isDnq || !showMadeCutCounts
+                        ? null
+                        : `${s.made_cut_count ?? 0}/${rosterSize}`;
                     const row = (
                       <div className="flex items-center gap-3 px-4 py-3">
                         <div className="w-7 shrink-0 text-center font-mono text-sm text-muted-foreground">
@@ -979,8 +1029,15 @@ function LeaguePage() {
                                 }`}
                           </div>
                         </div>
-                        <div className="shrink-0 text-right font-mono text-base font-semibold tabular-nums text-success">
-                          {s.total_points.toFixed(1)}
+                        <div className="shrink-0 text-right">
+                          <div className="font-mono text-base font-semibold tabular-nums text-success">
+                            {s.total_points.toFixed(1)}
+                          </div>
+                          {!isDnq && showMadeCutCounts ? (
+                            <div className="mt-0.5 font-mono text-[11px] tabular-nums text-muted-foreground">
+                              {madeCutLabel} cut
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     );
@@ -1012,6 +1069,9 @@ function LeaguePage() {
                         <th className="px-5 py-2.5">Golfers</th>
                         <th className="px-5 py-2.5 text-right">Spent</th>
                         <th className="px-5 py-2.5 text-right">Fantasy Pts</th>
+                        {showMadeCutCounts ? (
+                          <th className="px-5 py-2.5 text-right">Made cut</th>
+                        ) : null}
                         <th className="px-5 py-2.5 text-right">Season Pts</th>
                       </tr>
                     </thead>
@@ -1023,6 +1083,9 @@ function LeaguePage() {
                         const place = s.league_finish ?? i + 1;
                         const showSeasonPts =
                           selectedTournament?.status === "completed" || s.league_finish != null;
+                        const madeCutLabel = isDnq
+                          ? "—"
+                          : `${s.made_cut_count ?? 0}/${rosterSize}`;
                         return (
                           <tr
                             key={s.user_id}
@@ -1074,6 +1137,11 @@ function LeaguePage() {
                             <td className="px-5 py-3 text-right font-mono text-base font-semibold tabular-nums text-success">
                               {s.total_points.toFixed(1)}
                             </td>
+                            {showMadeCutCounts ? (
+                              <td className="px-5 py-3 text-right font-mono tabular-nums text-muted-foreground">
+                                {madeCutLabel}
+                              </td>
+                            ) : null}
                             <td className="px-5 py-3 text-right font-mono tabular-nums text-muted-foreground">
                               {showSeasonPts ? s.season_points.toFixed(1) : "—"}
                             </td>

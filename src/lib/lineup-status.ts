@@ -44,6 +44,8 @@ type StandingBase = {
   golfer_count: number;
   league_finish: number | null;
   season_points: number;
+  /** Starters with made_cut === true; omitted on synthetic DNQ rows. */
+  made_cut_count?: number;
 };
 
 export type EventStandingWithDnq = StandingBase & {
