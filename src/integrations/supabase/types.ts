@@ -667,6 +667,10 @@ export type Database = {
           name: string
         }[]
       }
+      kick_league_member: {
+        Args: { _league_id: string; _user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       tournament_event_type: "standard" | "signature" | "major"

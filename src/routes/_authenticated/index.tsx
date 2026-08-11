@@ -1,4 +1,4 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -16,7 +16,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Trophy, Users, Plus, LogIn, ArrowRight } from "lucide-react";
+import { Trophy, Users, Plus, LogIn, ArrowRight, BookOpen } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 
@@ -81,6 +81,12 @@ function DashboardPage() {
         description="Create a salary-cap pool or join with an invite code."
         actions={
           <>
+            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Link to="/how-it-works">
+                <BookOpen className="mr-2 h-4 w-4" />
+                How it works
+              </Link>
+            </Button>
             <JoinLeague onJoined={load} />
             <CreateLeague onCreated={load} />
           </>
@@ -106,6 +112,9 @@ function DashboardPage() {
           <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
             Start one for your group or join with a code to begin drafting lineups.
           </p>
+          <Button asChild variant="link" className="mt-3 text-primary">
+            <Link to="/how-it-works">How scoring works</Link>
+          </Button>
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

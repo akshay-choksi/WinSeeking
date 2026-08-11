@@ -1,0 +1,25 @@
+---
+description: Keep the public How it works guide accurate when fantasy scoring or player-facing game rules change
+globs: src/lib/scoring.ts,src/routes/how-it-works.tsx,src/lib/lineup-status.ts
+alwaysApply: false
+---
+
+# Sync How it works with game rules
+
+When changing **player-facing** fantasy rules — scoring values, season multipliers, finish points, lock/DNQ behavior, salary-cap/roster defaults, money-hole quirks, Harry’s Big Hole, Nickname de Sarge, or similar — update the public guide in the same change.
+
+## Required
+
+1. Update `src/routes/how-it-works.tsx` so copy, tables, and examples match the new rules.
+2. Prefer **deriving** displayed numbers from `src/lib/scoring.ts` (`SCORING`, `BONUS_SCORING`, `MONEY_HOLE_MULTIPLIER`, `finishPoints`, `multiplierForEventType`, etc.) or other shared constants — do not hardcode literals that can drift.
+3. If the guide needs a constant that doesn’t exist yet, add it to the shared module and import it; don’t duplicate magic numbers in the route.
+
+## Checklist
+
+- [ ] Hole / bonus / finish / multiplier / money-hole numbers in the guide match `src/lib/scoring.ts`
+- [ ] Lock, DNQ, roster, and cap wording matches product behavior
+- [ ] Named quirks (Harry’s Big Hole, Nickname de Sarge, etc.) still describe current rules
+
+## Out of scope
+
+Internal refactors, UI-only tweaks, or scoring implementation details that do not change what players see — no guide update required.

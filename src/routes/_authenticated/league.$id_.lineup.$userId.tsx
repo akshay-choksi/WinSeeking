@@ -25,6 +25,7 @@ import {
   type Tournament,
 } from "@/lib/scoring";
 import { initialsFromName } from "@/lib/profile";
+import { computeOwnershipStats, ownershipKind } from "@/lib/ownership";
 import { HarrysBigHole } from "@/components/harrys-big-hole";
 
 export const Route = createFileRoute("/_authenticated/league/$id_/lineup/$userId")({
@@ -81,12 +82,13 @@ type GolferRow = {
 };
 
 function OwnershipBadge({ pickCount, lineupCount }: { pickCount: number; lineupCount: number }) {
-  if (lineupCount < 2 || pickCount < 1) return null;
+  const kind = ownershipKind(pickCount, lineupCount);
+  if (!kind) return null;
   const fraction = `${pickCount}/${lineupCount}`;
-  if (pickCount === 1) {
+  if (kind === "unique") {
     return <StatusBadge tone="open">Unique · {fraction}</StatusBadge>;
   }
-  if (pickCount === lineupCount) {
+  if (kind === "everyone") {
     return <StatusBadge tone="muted">Everyone · {fraction}</StatusBadge>;
   }
   return <StatusBadge tone="muted">{fraction}</StatusBadge>;
@@ -423,24 +425,20 @@ function LineupViewerPage() {
         ? (async () => {
             const { data: leagueLineups } = await supabase
               .from("lineups")
-              .select("id")
+              .select("id, user_id")
               .eq("league_id", leagueId)
               .eq("tournament_id", active.id);
             const lineupIds = (leagueLineups ?? []).map((l) => l.id);
             if (lineupIds.length === 0) {
-              return { lineupCount: 0, pickCounts: new Map<string, number>() };
+              return computeOwnershipStats([], []);
             }
             const { data: leagueEntries } = await supabase
               .from("lineup_entries")
-              .select("golfer_id")
+              .select("lineup_id, golfer_id")
               .in("lineup_id", lineupIds);
-            const pickCounts = new Map<string, number>();
-            for (const entry of leagueEntries ?? []) {
-              pickCounts.set(entry.golfer_id, (pickCounts.get(entry.golfer_id) ?? 0) + 1);
-            }
-            return { lineupCount: lineupIds.length, pickCounts };
+            return computeOwnershipStats(leagueLineups ?? [], leagueEntries ?? []);
           })()
-        : Promise.resolve({ lineupCount: 0, pickCounts: new Map<string, number>() }),
+        : Promise.resolve(computeOwnershipStats([], [])),
     ]);
     if (gen !== loadGenRef.current) return;
 

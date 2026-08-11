@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trophy, ArrowLeft, Zap, Medal, Eye, Copy, X, LogIn } from "lucide-react";
+import { Trophy, ArrowLeft, Zap, Medal, Eye, Copy, X, LogIn, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
@@ -28,6 +28,11 @@ import {
   mergeEventStandingsWithMissingMembers,
   type EventStandingWithDnq,
 } from "@/lib/lineup-status";
+import {
+  buildOwnershipRoasts,
+  computeOwnershipStats,
+  type OwnershipRoast,
+} from "@/lib/ownership";
 import { pickDayLeaderQuote } from "@/lib/day-leader-quotes";
 import { pickDayCellarQuote } from "@/lib/day-cellar-quotes";
 import { initialsFromName } from "@/lib/profile";
@@ -36,6 +41,7 @@ import { SurfacePanel } from "@/components/surface-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EventHighlightsCarousel } from "@/components/event-highlights-carousel";
+import { OwnershipRoastChips } from "@/components/ownership-roast-chips";
 
 export const Route = createFileRoute("/_authenticated/league/$id")({
   component: LeaguePage,
@@ -127,6 +133,7 @@ function LeaguePage() {
   const [eventStandings, setEventStandings] = useState<EventStanding[]>([]);
   const [seasonStandings, setSeasonStandings] = useState<SeasonStanding[]>([]);
   const [topScorers, setTopScorers] = useState<TopScorer[]>([]);
+  const [ownershipRoasts, setOwnershipRoasts] = useState<OwnershipRoast[]>([]);
   const [showDayLeaderBanner, setShowDayLeaderBanner] = useState(false);
   const [moneyHoles, setMoneyHoles] = useState<MoneyHoleRow[]>([]);
   const [memberProfiles, setMemberProfiles] = useState<
@@ -317,9 +324,9 @@ function LeaguePage() {
         .from("lineup_entries")
         .select("lineup_id, golfer_id")
         .in("lineup_id", lineupIds);
-      pickCounts = new Map();
+      const stats = computeOwnershipStats(lineups ?? [], entries ?? []);
+      pickCounts = stats.pickCounts;
       for (const e of entries ?? []) {
-        pickCounts.set(e.golfer_id, (pickCounts.get(e.golfer_id) ?? 0) + 1);
         if (yourLineupId && e.lineup_id === yourLineupId) {
           yourGolferIds.add(e.golfer_id);
         }
@@ -345,6 +352,52 @@ function LeaguePage() {
     );
   }
 
+  /** Post-lock only — never call before lineup_lock_at / completed. */
+  async function loadOwnershipRoasts(tournamentId: string) {
+    const { data: lineups } = await supabase
+      .from("lineups")
+      .select("id, user_id")
+      .eq("league_id", id)
+      .eq("tournament_id", tournamentId);
+
+    if (!lineups?.length) {
+      setOwnershipRoasts([]);
+      return;
+    }
+
+    const lineupIds = lineups.map((l) => l.id);
+    const { data: entries } = await supabase
+      .from("lineup_entries")
+      .select("lineup_id, golfer_id")
+      .in("lineup_id", lineupIds);
+
+    const stats = computeOwnershipStats(lineups, entries ?? []);
+    if (stats.lineupCount < 2 || stats.pickCounts.size === 0) {
+      setOwnershipRoasts([]);
+      return;
+    }
+
+    const golferIds = [...stats.pickCounts.keys()];
+    const userIds = [...new Set(lineups.map((l) => l.user_id))];
+
+    const [{ data: golfers }, { data: profiles }] = await Promise.all([
+      supabase.from("golfers").select("id, name").in("id", golferIds),
+      supabase.from("profiles").select("id, full_name").in("id", userIds),
+    ]);
+
+    const golferNameById = new Map((golfers ?? []).map((g) => [g.id, g.name]));
+    const userNameById = new Map(
+      (profiles ?? []).map((p) => [p.id, p.full_name?.trim() || "Player"]),
+    );
+
+    setOwnershipRoasts(
+      buildOwnershipRoasts(stats, {
+        golferName: (gid) => golferNameById.get(gid) ?? "Golfer",
+        userName: (uid) => userNameById.get(uid) ?? "Player",
+      }),
+    );
+  }
+
   useEffect(() => {
     loadLeague();
     loadTournaments();
@@ -352,11 +405,25 @@ function LeaguePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, user?.id]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const selectedTournament = tournaments.find((t) => t.id === selectedTournamentId) ?? null;
+  const rosterSize = league?.max_players ?? 6;
+  const locked = selectedTournament
+    ? selectedTournament.status === "completed" ||
+      (!!selectedTournament.lineup_lock_at &&
+        nowMs >= new Date(selectedTournament.lineup_lock_at).getTime())
+    : false;
+
   useOnLiveScoresUpdated(() => {
     if (selectedTournamentId) {
       void loadEventStandings(selectedTournamentId);
       void loadTopScorers(selectedTournamentId);
       void loadMoneyHoles(selectedTournamentId);
+      if (locked) void loadOwnershipRoasts(selectedTournamentId);
     }
     void loadSeasonStandings();
   });
@@ -366,6 +433,7 @@ function LeaguePage() {
       setEventStandings([]);
       setTopScorers([]);
       setMoneyHoles([]);
+      setOwnershipRoasts([]);
       return;
     }
     loadEventStandings(selectedTournamentId);
@@ -379,6 +447,7 @@ function LeaguePage() {
       eventTimer = setTimeout(() => {
         void loadEventStandings(selectedTournamentId);
         void loadTopScorers(selectedTournamentId);
+        if (locked) void loadOwnershipRoasts(selectedTournamentId);
       }, 350);
     };
     const scheduleSeasonLoad = () => {
@@ -421,20 +490,17 @@ function LeaguePage() {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, selectedTournamentId, user?.id]);
+  }, [id, selectedTournamentId, user?.id, locked]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
+    if (!selectedTournamentId || !locked) {
+      setOwnershipRoasts([]);
+      return;
+    }
+    void loadOwnershipRoasts(selectedTournamentId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, selectedTournamentId, locked]);
 
-  const selectedTournament = tournaments.find((t) => t.id === selectedTournamentId) ?? null;
-  const rosterSize = league?.max_players ?? 6;
-  const locked = selectedTournament
-    ? selectedTournament.status === "completed" ||
-      (!!selectedTournament.lineup_lock_at &&
-        nowMs >= new Date(selectedTournament.lineup_lock_at).getTime())
-    : false;
   const lineupStatus = useMemo(
     () =>
       computeMemberLineupStatus(
@@ -605,6 +671,14 @@ function LeaguePage() {
           <PageHeader
             eyebrow="League"
             title={league.name}
+            actions={
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/league/$id/settings" params={{ id }}>
+                  <Settings className="mr-1.5 h-4 w-4" />
+                  Settings
+                </Link>
+              </Button>
+            }
             description={
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <button
@@ -815,6 +889,15 @@ function LeaguePage() {
               </StatusBadge>
             )}
           </div>
+
+          {locked && ownershipRoasts.length > 0 ? (
+            <div className="rounded-xl border border-border/80 bg-card px-4 py-3 shadow-sm">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Ownership
+              </p>
+              <OwnershipRoastChips roasts={ownershipRoasts} />
+            </div>
+          ) : null}
 
           {(todaysMoneyHole && moneyHoleRound != null) || topScorers.length > 0 ? (
             <EventHighlightsCarousel

@@ -1,4 +1,4 @@
-import { ClientOnly, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ClientOnly, Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -70,7 +70,15 @@ function AuthPage() {
           <GoogleIcon className="mr-2 h-5 w-5" />
           {loading ? "Redirecting…" : "Continue with Google"}
         </Button>
-        <p className="mt-6 text-center text-xs text-muted-foreground">
+        <p className="mt-4 text-center text-sm">
+          <Link
+            to="/how-it-works"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            How scoring works
+          </Link>
+        </p>
+        <p className="mt-4 text-center text-xs text-muted-foreground">
           By continuing you agree to play fair and finish your rounds.
         </p>
       </Card>

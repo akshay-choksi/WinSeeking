@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
-import { Flag, LayoutGrid, LogOut, Shield, ChevronDown, UserRound } from "lucide-react";
+import { BookOpen, Flag, LayoutGrid, LogOut, Shield, ChevronDown, UserRound } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useProfile } from "@/hooks/use-profile";
@@ -31,6 +31,7 @@ export function AppHeader() {
   }
 
   const onLeagues = pathname === "/" || pathname.startsWith("/league");
+  const onHowItWorks = pathname.startsWith("/how-it-works");
   const onAdmin = pathname.startsWith("/admin");
   const displayName = profile?.full_name?.trim() || user?.email || "Account";
   const initials = initialsFromName(profile?.full_name, user?.email);
@@ -60,6 +61,10 @@ export function AppHeader() {
             <LayoutGrid className="h-4 w-4" />
             Leagues
           </NavLink>
+          <NavLink to="/how-it-works" active={onHowItWorks}>
+            <BookOpen className="h-4 w-4" />
+            How it works
+          </NavLink>
           {isAdmin ? (
             <NavLink to="/admin" active={onAdmin}>
               <Shield className="h-4 w-4" />
@@ -80,6 +85,17 @@ export function AppHeader() {
               )}
             >
               <Link to="/">Leagues</Link>
+            </Button>
+            <Button
+              asChild
+              variant={onHowItWorks ? "secondary" : "ghost"}
+              size="sm"
+              className={cn(
+                "h-10 min-w-10 px-3",
+                onHowItWorks && "bg-brand-muted text-accent-foreground",
+              )}
+            >
+              <Link to="/how-it-works">Guide</Link>
             </Button>
             {isAdmin ? (
               <Button
@@ -139,6 +155,12 @@ export function AppHeader() {
                   Leagues
                 </Link>
               </DropdownMenuItem>
+              <DropdownMenuItem asChild className="sm:hidden">
+                <Link to="/how-it-works">
+                  <BookOpen className="h-4 w-4" />
+                  How it works
+                </Link>
+              </DropdownMenuItem>
               {isAdmin ? (
                 <DropdownMenuItem asChild className="sm:hidden">
                   <Link to="/admin">
@@ -168,7 +190,7 @@ function NavLink({
   active,
   children,
 }: {
-  to: "/admin" | "/";
+  to: "/admin" | "/" | "/how-it-works";
   active: boolean;
   children: ReactNode;
 }) {
