@@ -24,6 +24,7 @@ import {
   type Tournament,
 } from "@/lib/scoring";
 import { pickDayLeaderQuote } from "@/lib/day-leader-quotes";
+import { pickDayCellarQuote } from "@/lib/day-cellar-quotes";
 import { initialsFromName } from "@/lib/profile";
 import { PageHeader } from "@/components/page-header";
 import { SurfacePanel } from "@/components/surface-panel";
@@ -421,6 +422,20 @@ function LeaguePage() {
     dayLeaderRound != null && dayLeaderRound >= 1 && selectedTournament
       ? pickDayLeaderQuote(id, selectedTournament.id, dayLeaderRound)
       : null;
+  const dayCellar =
+    eventStandings.length > 1 ? (eventStandings.at(-1) ?? null) : null;
+  const dayCellarTied =
+    !!dayCellar &&
+    eventStandings.length > 2 &&
+    eventStandings.at(-2)!.total_points === dayCellar.total_points;
+  const dayCellarName = dayCellar?.full_name?.trim() || "Player";
+  const dayCellarQuote =
+    dayCellar &&
+    dayLeaderRound != null &&
+    dayLeaderRound >= 1 &&
+    selectedTournament
+      ? pickDayCellarQuote(id, selectedTournament.id, dayLeaderRound, dayCellarName)
+      : null;
   const moneyHoleRound = selectedTournament ? currentMoneyHoleRound(selectedTournament) : null;
   const todaysMoneyHole =
     moneyHoleRound != null
@@ -550,25 +565,51 @@ function LeaguePage() {
           />
 
           {showDayLeaderBanner && dayLeader && dayLeaderRound != null && dayLeaderQuote && (
-            <div className="relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-card p-4 shadow-sm sm:p-5">
+            <div className="relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-card shadow-sm">
               <button
                 type="button"
                 onClick={() => void dismissDayLeaderBanner()}
-                className="absolute right-3 top-3 rounded-full p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                className="absolute right-3 top-3 z-10 rounded-full p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
                 aria-label="Dismiss day leader banner"
               >
                 <X className="h-4 w-4" />
               </button>
-              <p className="pr-8 text-xs font-semibold uppercase tracking-wide text-primary">
+              <p className="px-4 pt-4 pr-10 text-xs font-semibold uppercase tracking-wide text-primary sm:px-5 sm:pt-5">
                 After Round {dayLeaderRound}
               </p>
-              <p className="mt-1 pr-8 text-lg font-semibold tracking-tight text-foreground">
-                {dayLeader.full_name ?? "Player"}
-                {dayLeaderTied ? " (tied)" : ""} leads the league
-              </p>
-              <p className="mt-2 max-w-2xl text-sm italic text-muted-foreground">
-                “{dayLeaderQuote}”
-              </p>
+              <div
+                className={
+                  dayCellar && dayCellarQuote
+                    ? "mt-1 grid sm:grid-cols-2"
+                    : "mt-1"
+                }
+              >
+                <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+                  <p className="pr-8 text-lg font-semibold tracking-tight text-foreground">
+                    {dayLeader.full_name ?? "Player"}
+                    {dayLeaderTied ? " (tied)" : ""} leads the league
+                  </p>
+                  <p className="mt-2 text-sm italic text-muted-foreground">
+                    “{dayLeaderQuote}”
+                  </p>
+                </div>
+                {dayCellar && dayCellarQuote ? (
+                  <div className="border-t border-primary/15 bg-amber-950/[0.04] px-4 pb-4 pt-3 sm:border-l sm:border-t-0 sm:px-5 sm:pb-5 sm:pt-0 dark:bg-amber-950/20">
+                    <p className="flex items-start gap-2 pr-8 text-lg font-semibold tracking-tight text-foreground">
+                      <span aria-hidden className="mt-0.5 shrink-0 text-xl leading-none">
+                        💩
+                      </span>
+                      <span>
+                        {dayCellarName}
+                        {dayCellarTied ? " (tied)" : ""} owns last place
+                      </span>
+                    </p>
+                    <p className="mt-2 text-sm italic text-muted-foreground">
+                      “{dayCellarQuote}”
+                    </p>
+                  </div>
+                ) : null}
+              </div>
             </div>
           )}
 
