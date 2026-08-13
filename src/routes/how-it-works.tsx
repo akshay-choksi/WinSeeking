@@ -209,8 +209,9 @@ function HowItWorksPage() {
                 Nickname de Sarge
               </h3>
               <p className="mt-1.5">
-                Optional toggle (profile / draft) that swaps tour names for Sarge nicknames —
-                pure vibes, zero scoring impact.
+                Optional toggle (profile / draft) that swaps tour names for Sarge nicknames on
+                draft, lineups, highlights, and ownership callouts — pure vibes, zero scoring
+                impact. Member leaderboards stay real names.
               </p>
             </div>
             <div>

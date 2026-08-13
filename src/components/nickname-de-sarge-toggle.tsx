@@ -66,7 +66,7 @@ export function NicknameDeSargeToggle({
             comfortable ? "text-sm" : "text-xs",
           )}
         >
-          Tap to swap tour names for Sarge nicknames
+          Golfer names only — draft, lineups, highlights, callouts
         </span>
       </span>
 
