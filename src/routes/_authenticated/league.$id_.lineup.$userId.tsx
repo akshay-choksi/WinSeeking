@@ -9,6 +9,7 @@ import { ArrowLeft, Lock, RefreshCw } from "lucide-react";
 import { GolferAvatar } from "@/components/golfer-avatar";
 import { GolferInfoButton } from "@/components/golfer-info";
 import { GolferName } from "@/components/golfer-name";
+import { NicknameDeSargeToggle } from "@/components/nickname-de-sarge-toggle";
 import { StatusBadge } from "@/components/status-badge";
 import { StatCard } from "@/components/stat-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -707,6 +708,8 @@ function LineupViewerPage() {
         </div>
       </div>
 
+      <NicknameDeSargeToggle id="lineup-nickname-de-sarge" />
+
       <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
         {rows.length === 0 ? (
           <div className="p-10 text-center text-sm text-muted-foreground">
@@ -737,7 +740,11 @@ function LineupViewerPage() {
                       <GolferAvatar name={r.name} pgaPlayerNum={r.pga_player_num} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1">
-                          <GolferName name={r.name} className="font-medium text-foreground" />
+                          <GolferName
+                            name={r.name}
+                            className="font-medium text-foreground"
+                            showRealNameHint
+                          />
                           <GolferInfoButton golfer={toGolferInfo(r)} />
                         </div>
                         <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
@@ -838,7 +845,11 @@ function LineupViewerPage() {
                             <GolferAvatar name={r.name} pgaPlayerNum={r.pga_player_num} />
                             <div className="min-w-0">
                               <div className="flex items-center gap-1">
-                                <GolferName name={r.name} className="font-medium text-foreground" />
+                                <GolferName
+                                  name={r.name}
+                                  className="font-medium text-foreground"
+                                  showRealNameHint
+                                />
                                 <GolferInfoButton golfer={toGolferInfo(r)} />
                               </div>
                               <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
