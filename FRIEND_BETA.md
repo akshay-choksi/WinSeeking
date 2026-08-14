@@ -10,6 +10,8 @@ Use this before inviting friends onto the shared Lovable + Supabase project.
 
 Do **not** re-run `supabase/seed_weekend_golfers_demo.sql` or `supabase/seed_3m_open_draft_demo.sql` on the shared prod DB during beta.
 
+Optional local draft fixture: `supabase/seed_draft_demo_tournament.sql` inserts a separate **WinSeeking Draft Demo** event (does not unlock St. Jude). Teardown: `supabase/seed_draft_demo_tournament_teardown.sql`. Avoid leaving it on shared prod.
+
 ## Status
 
 | Step | Status |

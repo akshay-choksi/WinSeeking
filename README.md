@@ -6,7 +6,7 @@ Salary-cap fantasy golf for friends: pick 6 golfers under a $50,000 cap, score l
 
 ## Application preview
 
-Preview stills and the walkthrough below are from the older WinHunters UI. Recapture on WinSeeking (shot list: [`docs/screenshots/README.md`](docs/screenshots/README.md)), upload in GitHub’s README editor, and paste the new Markdown under each heading.
+Stills and walkthrough from the current WinSeeking UI ([`docs/screenshots/`](docs/screenshots/README.md)). GitHub renders the images below; the `.mov` may show as a download rather than an inline player.
 
 ### Product flow
 
@@ -23,23 +23,37 @@ Admin → Sync Odds → Sync Results (auto-finalizes when the PGA event is offic
 
 League list with create / join, invite codes, and salary-cap badges.
 
-<img width="1440" height="812" alt="Screenshot 2026-07-17 at 11 16 48 AM" src="https://github.com/user-attachments/assets/364823ad-5c49-434e-96b4-21cc2a0fe19f" />
+![Dashboard — your leagues](docs/screenshots/01-dashboard-leagues.png)
+
+### League home
+
+Live league board with day-leader banner, event selector, and season context.
+
+![League home with day-leader banner](docs/screenshots/02-league-home.png)
 
 ### Event leaderboard
 
-League home: live standings, event selector, season multipliers, and your points summary.
+Standings with ownership and fantasy-points leaders.
 
-<img width="1383" height="755" alt="Screenshot 2026-07-17 at 11 17 06 AM" src="https://github.com/user-attachments/assets/cab6c527-fa73-48d4-bee6-095fc4e53002" />
+![Event leaderboard](docs/screenshots/03-event-leaderboard.png)
+
+### Draft
+
+Salary-cap draft: search golfers, salaries, and add to a six-player lineup.
+
+![Salary-cap draft](docs/screenshots/04-draft.png)
 
 ### Live lineup scoring
 
-Member lineup viewer: navy summary card, per-golfer breakdown, live fantasy points.
+Member lineup viewer: summary card, Harry’s Big Hole, per-golfer breakdown, live fantasy points.
 
-<img width="1440" height="827" alt="Screenshot 2026-07-17 at 11 17 17 AM" src="https://github.com/user-attachments/assets/30a8849f-ad09-4481-9b8b-b2d994c57759" />
+![Live lineup scoring](docs/screenshots/05-live-lineup.png)
 
 ### Walkthrough
 
-https://github.com/user-attachments/assets/67b719d7-fa95-4521-9e5a-b84f4e0fc78a
+<video src="docs/screenshots/06-product-walkthrough.mov" controls title="WinSeeking product walkthrough"></video>
+
+[Download the product walkthrough](docs/screenshots/06-product-walkthrough.mov) (QuickTime `.mov`, ~40 MB).
 
 ---
 
@@ -201,4 +215,5 @@ supabase/
 - **Friend beta:** follow [`FRIEND_BETA.md`](FRIEND_BETA.md) (OAuth allowlist, security migration, DataGolf ops, dry-run before invites).
 - **Sync performance:** `sync-results` scores DK Classic in the Edge Function, fetches DataGolf in-play + ESPN hole-by-hole in parallel, and rolls up lineups in memory (~2–3s for a full field).
 - **Demo seed:** [`supabase/seed_weekend_golfers_demo.sql`](supabase/seed_weekend_golfers_demo.sql) — **do not** re-run on shared prod during friend beta.
+- **Draft demo seed:** [`supabase/seed_draft_demo_tournament.sql`](supabase/seed_draft_demo_tournament.sql) adds a separate open **WinSeeking Draft Demo** event (cloned salaries). Teardown: [`supabase/seed_draft_demo_tournament_teardown.sql`](supabase/seed_draft_demo_tournament_teardown.sql). Prefer local; do not leave a leftover demo event on shared prod.
 - Prefer not rewriting published git history on the Lovable-connected branch (no force-push / rebase of shared commits).

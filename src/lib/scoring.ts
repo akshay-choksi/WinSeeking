@@ -294,6 +294,11 @@ export function formatEventSeasonPtsLabel(
   return `${typeLabel} · ×${mLabel} Season Pts`;
 }
 
+/** Seeded demo event (`dg_event_id` like `ws-demo-draft`); live PGA events take priority. */
+export function isDemoTournament(tournament: Pick<Tournament, "dg_event_id">): boolean {
+  return tournament.dg_event_id.startsWith("ws-demo-");
+}
+
 /** Lineups lock at lineup_lock_at (or when the event is completed). Status in_progress alone does not lock — Sync Odds may set that early while drafting is still open. */
 export function isLineupLocked(tournament: Pick<Tournament, "lineup_lock_at" | "status">): boolean {
   if (tournament.status === "completed") return true;
@@ -317,12 +322,15 @@ export function pickActiveTournament(
 ): Tournament | null {
   if (!list.length) return null;
 
-  const inProgress = list.find((t) => t.status === "in_progress");
+  const live = list.filter((t) => !isDemoTournament(t));
+  const pool = live.length ? live : list;
+
+  const inProgress = pool.find((t) => t.status === "in_progress");
   if (inProgress) return inProgress;
-  const open = list.find((t) => t.status === "open");
+  const open = pool.find((t) => t.status === "open");
   if (open) return open;
 
-  const candidates = list.filter((t) => t.status !== "completed");
+  const candidates = pool.filter((t) => t.status !== "completed");
   if (!candidates.length) return null;
 
   const scored = candidates.map((t) => {
