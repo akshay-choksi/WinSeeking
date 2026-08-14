@@ -1,21 +1,21 @@
 # WinSeeking
 
-Salary-cap fantasy golf for friends: pick 6 golfers under a $50,000 cap, score live tournament fantasy points, and race for season standings with Signature (1.5×) and Major (2×) multipliers.
+Salary-cap fantasy golf for friends: pick 6 golfers under a $50,000 cap, score live DraftKings Classic points, and race a season board (Signature 1.5×, Major 2×). Daily **Harry’s Big Hole** triples hole scoring on one random hole per round.
 
 ---
 
 ## Application preview
 
-Polished sports-dashboard UI (green brand + navy emphasis panels) against the seeded Weekend Golfers league with mock tournament data.
-
-Upload each asset in GitHub’s README editor, then paste the generated Markdown under the matching heading.
+Preview stills and the walkthrough below are from the older WinHunters UI. Recapture on WinSeeking (shot list: [`docs/screenshots/README.md`](docs/screenshots/README.md)), upload in GitHub’s README editor, and paste the new Markdown under each heading.
 
 ### Product flow
 
 ```
-Auth → Home (leagues) → League (event + season boards)
+Auth → Home (leagues) → League (event + season boards, highlights, recap)
                      ↘ Draft (salary-cap lineup)
-                     ↘ Lineup viewer (live scoring breakdown)
+                     ↘ Lineup viewer (live scoring + bonuses)
+                     ↘ Event recap (podium, money holes, ownership)
+                     ↘ Profile / How it works
 Admin → Sync Odds → Sync Results (auto-finalizes when the PGA event is official)
 ```
 
@@ -45,47 +45,33 @@ https://github.com/user-attachments/assets/67b719d7-fa95-4521-9e5a-b84f4e0fc78a
 
 ## Stack
 
-| Layer            | Choice                                                                                                   |
-| ---------------- | -------------------------------------------------------------------------------------------------------- |
-| UI               | React 19, TypeScript, Vite, TanStack Start / Router                                                      |
-| Components       | shadcn/ui (Radix), Tailwind CSS v4 design tokens (`primary` green, `navy`, `success`)                    |
-| App chrome       | Sticky `AppHeader`, `PageHeader`, `StatCard`, `SurfacePanel`, `StatusBadge`                              |
-| Backend          | [Supabase](https://supabase.com) (hosted Postgres + Auth + Edge Functions + Realtime)                    |
-| Golf data        | [DataGolf](https://datagolf.com/) HTTP API (schedule, field, odds, in-play)                              |
-| Hosting / editor | Connected to [Lovable](https://lovable.dev) (avoid force-pushing rewritten history on the synced branch) |
+| Layer     | Choice |
+| --------- | ------ |
+| App       | React 19, TypeScript, Vite, [TanStack Start](https://tanstack.com/start) / Router / Query |
+| UI        | shadcn/ui (Radix), Tailwind CSS v4 (green / navy tokens) |
+| Backend   | [Supabase](https://supabase.com) — Postgres, Google Auth, RLS, Realtime, Edge Functions |
+| Golf data | [DataGolf](https://datagolf.com/) (schedule, field, odds, in-play) + ESPN hole-by-hole / bios |
+| Hosting   | [Lovable](https://lovable.dev) (don’t force-push rewritten history on the synced branch) |
 
-### TypeScript
+Scoring math lives in [`src/lib/scoring.ts`](src/lib/scoring.ts) and the Edge Functions (Deno TS). Schema types are generated in [`src/integrations/supabase/types.ts`](src/integrations/supabase/types.ts).
 
-The whole app is TypeScript end-to-end:
+**Supabase in brief:** Google OAuth; RLS so members see league data and lineups lock after tee; Realtime on lineups / results / standings; Edge Functions `sync-odds`, `sync-results`, `finalize-event`, `enrich-golfer-bio`; `DATAGOLF_API_KEY` as a function secret only.
 
-- **Client** — strict TS routes/components under `src/`
-- **Generated types** — [`src/integrations/supabase/types.ts`](src/integrations/supabase/types.ts) mirrors the Postgres schema for typed Supabase queries
-- **Scoring helpers** — [`src/lib/scoring.ts`](src/lib/scoring.ts) (fantasy breakdown, American odds, event multipliers)
-- **Edge functions** — Deno TypeScript under [`supabase/functions/`](supabase/functions/)
+**DataGolf (Scratch Plus):** schedule, field/tee times, outrights odds, pre-tournament preds + rankings (hybrid salaries), in-play scores. Headshots come from the PGA Tour Cloudinary CDN (`player_num`). ESPN supplies hole-by-hole tallies for DK bonuses and season form.
 
-### Supabase features used
+---
 
-| Feature                           | How WinSeeking uses it                                                                                                    |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| **Auth**                          | Google OAuth (and session cookies) for signed-in leagues                                                                  |
-| **Postgres**                      | Leagues, members, tournaments, golfers, prices, lineups, results, season standings                                        |
-| **Row Level Security (RLS)**      | Members see co-members’ data; lineup edits locked after tee; admin writes gated                                           |
-| **Database functions / triggers** | `is_league_member`, `compute_fantasy_points`, lineup lock enforcement, creator auto-join                                  |
-| **Realtime**                      | `postgres_changes` on `lineups`, `lineup_entries`, `player_results`, `season_standings` so boards refresh without polling |
-| **Edge Functions**                | `sync-odds`, `sync-results`, `finalize-event` (service role + admin check)                                                |
-| **Secrets**                       | `DATAGOLF_API_KEY` stored as an Edge Function secret (never in the Vite client)                                           |
+## Capabilities
 
-### DataGolf API
-
-Edge functions call DataGolf feeds (Scratch Plus key required), including:
-
-- `/get-schedule` — PGA schedule + completed/upcoming status
-- `/field-updates` — active field, tee times, OWGR, PGA `player_num` (for headshots)
-- `/betting-tools/outrights` — market win odds (hybrid salary input)
-- `/preds/pre-tournament` + `/preds/get-dg-rankings` — course-win / form / rank blended with odds → tiered salaries ($7k–$11.5k)
-- `/preds/in-play` (+ optional live hole stats) — live positions / scores → fantasy points
-
-Headshots use the PGA Tour Cloudinary CDN keyed by `player_num` (DataGolf does not serve images).
+- **Salary-cap draft** — 6 golfers under a league cap (default $50k). Hybrid salaries blend market odds with DataGolf course-win / form / rank (~$6.5k–$11k band).
+- **Live DK Classic scoring** — hole points, live place bonuses, streaks / bogey-free / hole-in-one; bonus breakdown on lineup tooltips. Scores refresh on sign-in, pull-to-refresh, or from an in-progress lineup; boards update over Realtime.
+- **Harry’s Big Hole** — one random hole per round at **3×** hole scoring, with a one-shot reveal and carousel on the league board.
+- **Event + season boards** — live standings, day-leader / cellar banners, made-cut counts after the weekend, Signature 1.5× / Major 2× season multipliers. Auto-finalize when PGA results are official.
+- **Event recap** — podium, money-hole history, and ownership callouts after the event is done.
+- **League life** — invite codes, settings / kick, lock reminders, empty-lineup DNQ handling, profile (display name + avatar).
+- **Player intel** — Wikipedia bios + ESPN season form in golfer popovers.
+- **Nickname de Sarge** — optional tour-pro nicknames on draft, lineups, highlights, and ownership (no scoring impact).
+- **Public rules** — [`/how-it-works`](src/routes/how-it-works.tsx) scoring guide. Admin **Sync Odds / Results** for DataGolf ops.
 
 ---
 
@@ -151,6 +137,7 @@ supabase secrets set DATAGOLF_API_KEY=your_key_here
 supabase functions deploy sync-odds
 supabase functions deploy sync-results
 supabase functions deploy finalize-event
+supabase functions deploy enrich-golfer-bio
 ```
 
 More detail: [`supabase/FUNCTIONS.md`](supabase/FUNCTIONS.md).
@@ -172,11 +159,11 @@ Then open `/admin` → **Sync Tournament Odds**.
 
 1. **Create / join a league** (invite code, $50k / 6 golfers by default).
 2. **Draft** a lineup before `lineup_lock_at` (first tee / Thursday). Over-budget adds are blocked.
-3. **Event leaderboard** ranks lineup fantasy points and updates through Supabase Realtime.
-4. **Lineup viewer** shows the live per-golfer breakdown and lets league members request a DataGolf refresh during an event.
-5. When the PGA event is final, **Sync Results** (or **Sync Odds**) auto-finalizes: season points from league finish × event multiplier (standard 1× / signature 1.5× / major 2×), stores place/season points on each lineup, and tracks wins / top-5s. Manual **Finalize Event** remains as a fallback.
+3. **Event leaderboard** ranks lineup fantasy points over Realtime, with Harry’s Big Hole, day leaders, and made-cut counts.
+4. **Lineup viewer** shows the live per-golfer breakdown (including DK bonuses) and lets members refresh DataGolf during an event.
+5. When the PGA event is official, **Sync Results** auto-finalizes: season points from league finish × event multiplier, then the **event recap** covers podium, money holes, and ownership. Manual **Finalize Event** is a fallback.
 
-Fantasy scoring follows **DraftKings Classic Golf**: hole points (eagle +8, birdie +3, par +0.5, bogey −0.5, double+ −1), live place bonuses (1st +30 … 50th +1), plus DK streaks/bonuses. Place points update on every live score refresh.
+Player-facing rules: [`/how-it-works`](src/routes/how-it-works.tsx). Scoring constants: [`src/lib/scoring.ts`](src/lib/scoring.ts).
 
 ---
 
@@ -184,16 +171,14 @@ Fantasy scoring follows **DraftKings Classic Golf**: hole points (eagle +8, bird
 
 ```
 src/
-  routes/           # TanStack file routes (league, draft, lineup, admin, auth)
-  components/       # App chrome + shadcn/ui + GolferAvatar
-  styles.css        # Brand tokens (green / navy / success)
-  lib/scoring.ts    # Fantasy math, odds, multipliers
+  routes/           # TanStack file routes (league, draft, lineup, recap, admin, how-it-works)
+  components/       # App chrome, shadcn/ui, Harry’s Big Hole, ownership chips
+  lib/              # Scoring, ownership, nicknames, live refresh
   integrations/supabase/
 supabase/
   migrations/       # Schema, RLS, triggers
-  functions/        # sync-odds, sync-results, finalize-event
+  functions/        # sync-odds, sync-results, finalize-event, enrich-golfer-bio
   FUNCTIONS.md      # Ops for DataGolf + deploys
-docs/screenshots/   # README preview assets (optional local copies)
 ```
 
 ---
@@ -214,7 +199,6 @@ docs/screenshots/   # README preview assets (optional local copies)
 
 - **Hosting:** see [`HOSTING.md`](HOSTING.md) for Lovable Free-plan limits, production redirects, live refresh behavior, and Cloudflare deployment.
 - **Friend beta:** follow [`FRIEND_BETA.md`](FRIEND_BETA.md) (OAuth allowlist, security migration, DataGolf ops, dry-run before invites).
-- **Live results:** members trigger a DataGolf refresh on sign-in, pull-to-refresh, or from an in-progress lineup. Realtime updates every open view.
-- **Sync performance win:** `sync-results` scores DraftKings Classic fantasy points in the Edge Function (mirroring SQL `compute_fantasy_points`), fetches DataGolf in-play + ESPN hole-by-hole tallies in parallel, and rolls up lineup totals from in-memory results — typically ~2–3s for 156 players on live Open data.
-- **Demo seed:** [`supabase/seed_weekend_golfers_demo.sql`](supabase/seed_weekend_golfers_demo.sql) can populate a sample league for UI demos — **do not** re-run on shared prod during friend beta.
+- **Sync performance:** `sync-results` scores DK Classic in the Edge Function, fetches DataGolf in-play + ESPN hole-by-hole in parallel, and rolls up lineups in memory (~2–3s for a full field).
+- **Demo seed:** [`supabase/seed_weekend_golfers_demo.sql`](supabase/seed_weekend_golfers_demo.sql) — **do not** re-run on shared prod during friend beta.
 - Prefer not rewriting published git history on the Lovable-connected branch (no force-push / rebase of shared commits).
