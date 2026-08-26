@@ -123,6 +123,8 @@ export const SARGE_NICKNAMES: readonly SargeNicknameEntry[] = [
   {
     player: "Rory McIlroy",
     nicknames: ["Rors Maclamore", "Rory Makeral'roy", "MC Hammer Maclamore"],
+    sourceReel: "DcYShkax-XA",
+    screenshotConfirmed: true,
   },
   {
     player: "Tommy Fleetwood",
@@ -135,6 +137,8 @@ export const SARGE_NICKNAMES: readonly SargeNicknameEntry[] = [
   {
     player: "Chris Gotterup",
     nicknames: ["C. Gutta Gotti", "Gutta Gotti", "C. Gutta", "Butta Baaaaby"],
+    sourceReel: "DcYTk2gRfnf",
+    screenshotConfirmed: true,
   },
   {
     player: "Jason Day",
@@ -225,12 +229,30 @@ export const SARGE_NICKNAMES: readonly SargeNicknameEntry[] = [
     nicknames: ["Will Da Stork Zalatoris"],
   },
   {
+    player: "Wyndham Clark",
+    nicknames: [
+      "Clark Fkn Kent",
+      "Wyndham Clark Kent",
+      "Clarkwayyy",
+      "Win-dham Clark Kent",
+    ],
+    sourceReel: "DcaxrY9xBsU",
+    screenshotConfirmed: true,
+    notes: 'Sarge also jokes "Wyndham Resorts" when pairing with Rory.',
+  },
+  {
     player: "Andrew Novak",
     nicknames: ["Walking Golf Tall", "Andrew IT Novak", "Drew It Up"],
   },
   {
     player: "Tony Finau",
     nicknames: ["Big Tony Aces", "Tony Ventura", "Big Tony Finau"],
+  },
+  {
+    player: "Taylor Moore",
+    nicknames: ["T. Mo", "Big Taylor Moore"],
+    sourceReel: "DcaxrY9xBsU",
+    screenshotConfirmed: true,
   },
   {
     player: "Collin Morikawa",
@@ -266,6 +288,12 @@ export const SARGE_NICKNAMES: readonly SargeNicknameEntry[] = [
   {
     player: "Marco Penge",
     nicknames: ["Marco No Cringe Penge"],
+  },
+  {
+    player: "Patrick Cantlay",
+    nicknames: ["Pitty Pat Cantlay"],
+    sourceReel: "DcYWbINRNVI",
+    screenshotConfirmed: true,
   },
   {
     player: "Kurt Kitayama",
