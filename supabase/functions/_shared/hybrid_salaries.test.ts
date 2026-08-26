@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   HYBRID_MAX_SALARY,
   HYBRID_MIN_SALARY,
+  HYBRID_TOP_SALARY_DISCOUNT,
   computeHybridSalaries,
   type HybridSalaryInput,
 } from "./hybrid_salaries.ts";
@@ -98,7 +99,7 @@ describe("computeHybridSalaries curve", () => {
     const bottomSpread = Math.max(...bottom) - Math.min(...bottom);
     const floor = Math.min(...bottom);
 
-    assert.ok(fav >= HYBRID_MAX_SALARY - 500, `favorite near max, got ${fav}`);
+    assert.ok(fav >= HYBRID_MAX_SALARY - HYBRID_TOP_SALARY_DISCOUNT - 500, `favorite near max, got ${fav}`);
     assert.equal(Math.max(...salaries), fav);
 
     assert.ok(
@@ -107,8 +108,8 @@ describe("computeHybridSalaries curve", () => {
     );
     assert.ok(minContenderGap >= 200, "need some gap between favorite and #2");
     assert.ok(
-      contenders.every((c) => c >= 9800 && c <= 11100),
-      `elite contenders should sit ~9.8k–11.1k, got ${contenders}`,
+      contenders.every((c) => c >= 9300 && c <= 10600),
+      `elite contenders should sit ~9.3k–10.6k after top-3 discount, got ${contenders}`,
     );
     assert.ok(
       strongChalk < contenders[2] && strongChalk >= 8800,
@@ -138,11 +139,13 @@ describe("computeHybridSalaries curve", () => {
       `field mean should be ~7600–8200, got ${mean.toFixed(1)}`,
     );
 
-    // Cap checks: one stud + true longshot value works; two elites + floors usually don't.
+    // Cap checks: one stud + true longshot value works; three elites + floors blow cap.
     const long = priced.get("l20")!.salary;
     const oneStud = fav + mid[2] + 4 * long;
     const twoElites = fav + contenders[0] + 4 * long;
+    const threeElites = fav + contenders[0] + contenders[1] + 3 * long;
     assert.ok(oneStud <= 50000, `one-stud build should fit, got ${oneStud}`);
-    assert.ok(twoElites > 50000, `two-elite build should blow cap, got ${twoElites}`);
+    assert.ok(twoElites >= 48000, `two-elite build should be tight, got ${twoElites}`);
+    assert.ok(threeElites > 50000, `three-elite build should blow cap, got ${threeElites}`);
   });
 });

@@ -23,6 +23,9 @@ export const HYBRID_CURVE_POWER = 1.2;
 
 export const HYBRID_MIN_SALARY = 6900;
 export const HYBRID_MAX_SALARY = 11100;
+/** Flat discount applied to the top N salaries (favorites were pricing too high). */
+export const HYBRID_TOP_SALARY_DISCOUNT = 500;
+export const HYBRID_TOP_SALARY_DISCOUNT_COUNT = 3;
 
 export type HybridSalaryInput = {
   dgId: string;
@@ -177,6 +180,22 @@ export function computeHybridSalaries(
 
     out.set(dgId, { salary, impliedProb, decimalOdds, composite });
   }
+
+  // Pull top favorites down so one-stud builds are more viable.
+  const topIds = [...out.entries()]
+    .sort((a, b) => b[1].salary - a[1].salary || a[0].localeCompare(b[0]))
+    .slice(0, HYBRID_TOP_SALARY_DISCOUNT_COUNT)
+    .map(([dgId]) => dgId);
+  for (const dgId of topIds) {
+    const row = out.get(dgId);
+    if (!row) continue;
+    const discounted = Math.max(
+      minSalary,
+      Math.round((row.salary - HYBRID_TOP_SALARY_DISCOUNT) / step) * step,
+    );
+    out.set(dgId, { ...row, salary: discounted });
+  }
+
   return out;
 }
 
